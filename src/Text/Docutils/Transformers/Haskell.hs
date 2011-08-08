@@ -7,6 +7,16 @@ import Text.XML.HXT.Core
 import Text.Highlighting.Kate
 import Text.XHtml.Strict
 
+import Text.Docutils.Util
+
+hackagePrefix :: String
+hackagePrefix = "http://hackage.haskell.org/package/"
+
+hackage :: ArrowXml a => XmlT a
+hackage = onElemA "literal" [("classes", "pkg")] $
+            removeAttr "classes" >>>
+            mkLink (getChildren >>> getText >>> arr (hackagePrefix ++))
+            
 isHS :: ArrowXml (~>) => XmlTree ~> String
 isHS = isElem >>>
        hasName "literal" >>> 

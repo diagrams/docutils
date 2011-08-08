@@ -8,45 +8,22 @@ module Text.Docutils.Writers.HTML where
 
 import Text.XML.HXT.Core
 
-import qualified Control.Category as C
-
-type XmlT (~>) = XmlTree ~> XmlTree
+import Text.Docutils.Util
 
 ------------------------------------------------------------
 --  The main XML -> HTML conversion
 ------------------------------------------------------------
 
-xmlToHtml :: ArrowXml (~>) => XmlT (~>)
-xmlToHtml = tSections >>>
-            doTransforms [ tDocument
-                         , tLiterals
-                         , tRaw
-                         , tPara
-                         , tTitleRef
-                         , tInternalRef
-                         ]
-
-------------------------------------------------------------
---  Combinators
-------------------------------------------------------------
-
-doTransforms :: ArrowXml (~>) => [XmlT (~>)] -> XmlT (~>)
-doTransforms ts = doAll (map processTopDown ts)
-
-doAll :: ArrowXml (~>) => [XmlT (~>)] -> XmlT (~>)
-doAll = foldr (>>>) C.id
-
-onElem :: ArrowXml (~>) => String -> XmlT (~>) -> XmlT (~>)
-onElem e trans = trans `when` isTag e
-
-isTag :: ArrowXml (~>) => String -> XmlT (~>)
-isTag e = isElem >>> hasName e
-
-replaceTag :: ArrowXml (~>) => String -> String -> XmlT (~>)
-replaceTag t1 t2 = onElem t1 (setTag t2)
-
-setTag :: ArrowXml (~>) => String -> XmlT (~>)
-setTag t = selem t [getChildren]
+xml2html :: ArrowXml (~>) => XmlT (~>)
+xml2html = tSections >>>
+           doTransforms 
+           [ tDocument
+           , tLiterals
+           , tRaw
+           , tPara
+           , tTitleRef
+           , tReference
+           ]
 
 ------------------------------------------------------------
 --  Sections
@@ -61,7 +38,7 @@ tSections = tSections' (1 :: Integer)
                                , attr "id" (getAttrValue "ids" >>> mkText)
                                ]
                                [getChildren >>>
-                                  ( (isTag "title" >>> setTag ("h" ++ show n)) `orElse`
+                                  ( (isTag "title" >>> setTag ("h" ++ show n) []) `orElse`
                                     tSections' (n+1)
                                   )
                                ]
@@ -90,21 +67,30 @@ tDocument = onElem "document" $
               ]  
 
 tLiterals :: ArrowXml (~>) => XmlT (~>)
-tLiterals = replaceTag "literal" "code"
+tLiterals = replaceTag "literal" "code" []
         
 tRaw :: ArrowXml (~>) => XmlT (~>)
 tRaw = onElem "raw" $ getChildren
 
 tPara :: ArrowXml (~>) => XmlT (~>)
-tPara = replaceTag "paragraph" "p"
+tPara = replaceTag "paragraph" "p" []
 
 tTitleRef :: ArrowXml (~>) => XmlT (~>)
-tTitleRef = replaceTag "title_reference" "cite"
+tTitleRef = replaceTag "title_reference" "cite" []
 
-tInternalRef :: ArrowXml (~>) => XmlT (~>)
-tInternalRef = onElem "reference" $
-  mkelem "a"
-  [ attr "class" (txt "reference internal")
-  , attr "href" (getAttrValue "refid" >>> arr ('#':) >>> mkText)
-  ]
-  [ getChildren ]
+-- XXX check whether it is an internal or other sort of reference
+-- based on the attributes.
+tReference :: ArrowXml (~>) => XmlT (~>)
+tReference = onElem "reference" $
+  ifA (hasAttr "refuri")
+    (setTag "a"
+     [ attr "class" (txt "reference external")
+     , attr "href" (getAttrValue "refuri" >>> mkText)
+     ]
+    )
+    (setTag "a"
+     [ attr "class" (txt "reference internal")
+     , attr "href" (getAttrValue "refid" >>> arr ('#':) >>> mkText)
+     ]
+    )
+

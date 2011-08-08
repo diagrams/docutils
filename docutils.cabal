@@ -18,13 +18,14 @@ Source-repository head
 
 Library
   Exposed-modules:     Text.Docutils.CmdLine, 
+                       Text.Docutils.Util,
                        Text.Docutils.Transformers.Haskell, 
                        Text.Docutils.Writers.HTML
 
   Build-depends:       base >= 4.0 && < 4.5,
                        hxt >= 9.1.2 && < 9.2,
-                       hxt-http >= 9.1.2 && < 9.2,
                        xhtml >= 3000.2.0.1 && < 3000.3,
+                       hxt-http,
                        highlighting-kate >= 0.2.9 && < 0.3
 
   hs-source-dirs:      src
