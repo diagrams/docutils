@@ -1,0 +1,13 @@
+Name:                docutils
+Version:             0.1
+Synopsis:            Transformers and writers for docutils XML
+License:             BSD3
+License-file:        LICENSE
+Author:              Brent Yorgey
+Maintainer:          byorgey@cis.upenn.edu
+Category:            Text
+Build-type:          Simple
+Cabal-version:       >=1.2
+
+Library
+  Exposed-modules:     Text.Docutils.CmdLine, Text.Docutils.Transformers.Haskell, Text.Docutils.Writers.HTML
