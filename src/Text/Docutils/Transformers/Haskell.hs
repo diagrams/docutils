@@ -1,5 +1,8 @@
+{-# LANGUAGE TypeOperators #-}
 
 module Text.Docutils.Transformers.Haskell where
+
+import Text.XML.HXT.Core
 
 import Text.Highlighting.Kate
 import Text.XHtml.Strict
