@@ -18,9 +18,11 @@ xml2html :: ArrowXml (~>) => XmlT (~>)
 xml2html = tSections >>>
            doTransforms 
            [ tDocument
-           , tLiterals
-           , tRaw
            , tPara
+           , tEmph
+             
+           , tLiterals
+             
            , tTitleRef
            , tReference
            ]
@@ -69,9 +71,6 @@ tDocument = onElem "document" $
 tLiterals :: ArrowXml (~>) => XmlT (~>)
 tLiterals = replaceTag "literal" "code" []
         
-tRaw :: ArrowXml (~>) => XmlT (~>)
-tRaw = onElem "raw" $ getChildren
-
 tPara :: ArrowXml (~>) => XmlT (~>)
 tPara = replaceTag "paragraph" "p" []
 
@@ -94,3 +93,5 @@ tReference = onElem "reference" $
      ]
     )
 
+tEmph :: ArrowXml (~>) => XmlT (~>)
+tEmph = replaceTag "emphasis" "em" []
