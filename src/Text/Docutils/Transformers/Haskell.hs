@@ -13,9 +13,10 @@ hackagePrefix :: String
 hackagePrefix = "http://hackage.haskell.org/package/"
 
 hackage :: ArrowXml a => XmlT a
-hackage = onElemA "literal" [("classes", "pkg")] $
-            removeAttr "classes" >>>
-            mkLink (getChildren >>> getText >>> arr (hackagePrefix ++))
+hackage = 
+  onElemA "literal" [("classes", "pkg")] $
+    removeAttr "classes" >>>
+    mkLink (getChildren >>> getText >>> arr (hackagePrefix ++))
             
 isHS :: ArrowXml (~>) => XmlTree ~> String
 isHS = isElem >>>
