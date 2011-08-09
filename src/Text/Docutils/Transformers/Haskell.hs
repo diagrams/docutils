@@ -18,13 +18,11 @@ hackage =
     removeAttr "classes" >>>
     mkLink (getChildren >>> getText >>> arr (hackagePrefix ++))
             
-isHS :: ArrowXml (~>) => XmlTree ~> String
-isHS = isElem >>>
-       hasName "literal" >>> 
-       hasAttr "classes" >>> getAttrValue "classes" >>> isA (== "hs")
-
 highlightHS :: ArrowXml (~>) => XmlTree ~> XmlTree
-highlightHS = getChildren >>> getText >>> arr f >>> selem "raw" [mkText]
-  where f code = case highlightAs "haskell" code of
-                   Left   _ -> code
-                   Right ls -> showHtmlFragment (formatAsXHtml [OptInline] "haskell" ls)
+highlightHS = 
+  onElemA "literal" [("classes", "hs")] $
+    removeAttr "classes" >>>
+    getChildren >>> getText >>> arr highlight >>> hread
+  where highlight code = case highlightAs "haskell" code of
+                           Left   _ -> code
+                           Right ls -> showHtmlFragment (formatAsXHtml [OptInline] "haskell" ls)
