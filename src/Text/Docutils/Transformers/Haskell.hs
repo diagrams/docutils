@@ -2,7 +2,21 @@
 
 module Text.Docutils.Transformers.Haskell where
 
+import GHC
+import Packages
+import DynFlags
+import MonadUtils
+import Module
+import GHC.Paths (libdir)
+
+import Data.Maybe (listToMaybe, catMaybes, fromJust)
+import Data.List (isPrefixOf, intercalate)
+import qualified Data.Map as M
+
+import Data.List.Split
+
 import qualified Control.Category as C
+import Control.Arrow
 
 import Text.XML.HXT.Core
 
@@ -19,13 +33,13 @@ hackageAPIPrefix = "http://hackage.haskell.org/packages/archive/"
 hackageAPIPath   = "/latest/doc/html/"
 
 linkifyHackage :: ArrowXml a => XmlT a
-linkifyHackage = 
+linkifyHackage =
   onElemA "literal" [("classes", "pkg")] $
     removeAttr "classes" >>>
     mkLink (getChildren >>> getText >>> arr (hackagePkgPrefix ++))
-            
+
 highlightHS :: ArrowXml (~>) => XmlTree ~> XmlTree
-highlightHS = 
+highlightHS =
   onElemA "literal" [("classes", "hs")] $
     removeAttr "classes" >>>
     getChildren >>> getText >>> arr highlight >>> hread
@@ -34,7 +48,7 @@ highlightHS =
                            Right ls -> showHtmlFragment (formatAsXHtml [OptInline] "haskell" ls)
 
 styleFile :: ArrowXml (~>) => String -> XmlT (~>)
-styleFile s = 
+styleFile s =
   onElem "head" $
     C.id += (eelem "link" += attr "rel" (txt "stylesheet")
                           += attr "type" (txt "text/css")
@@ -44,15 +58,54 @@ styleFile s =
 -- XXX option to give multiple packages and have it look up the
 -- contents to determine where to link
 
--- first argument is package name
-linkifyModules :: ArrowXml (~>) => String -> XmlT (~>)
-linkifyModules pkgName =
+linkifyModules :: ArrowXml (~>) => ModuleMap -> XmlT (~>)
+linkifyModules modMap =
   onElemA "literal" [("classes", "mod")] $
     removeAttr "classes" >>>
-    mkLink (getChildren >>> getText >>> arr (mkAPILink pkgName))
+    mkLink (getChildren >>> getText >>> arr (mkAPILink modMap))
 
-mkAPILink :: String -> String -> String
-mkAPILink pkgName modName = hackageAPIPrefix ++ pkgName ++ hackageAPIPath ++ modPath
+mkAPILink :: ModuleMap -> String -> String
+mkAPILink modMap modName = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath
   where modPath = map f modName ++ ".html"
         f '.' = '-'
         f x   = x
+        pkg   = packageIdStringBase . fromJust $ M.lookup (mkModuleName modName) modMap
+        -- XXX
+
+------------------------------------------------------------
+--  Packages + modules
+------------------------------------------------------------
+
+type ModuleMap = M.Map ModuleName PackageId
+
+-- | Convert a 'PackageId' to a String without the trailing version number.
+packageIdStringBase :: PackageId -> String
+packageIdStringBase = intercalate "-" . init . splitOn "-" . packageIdString
+
+-- | Get the list of modules provided by a package.
+getPkgModules :: String -> IO (Maybe (PackageId, [ModuleName]))
+getPkgModules pkg =
+  defaultErrorHandler defaultDynFlags $ do
+    runGhc (Just libdir) $ do
+      dflags <- getSessionDynFlags
+      let dflags' = dflags { packageFlags = ExposePackage pkg : packageFlags dflags }
+      (dflags'', pids) <- liftIO $ initPackages dflags'
+      let pkgSt   = pkgState dflags''
+          mpid    = listToMaybe (filter ((pkg `isPrefixOf`) . packageIdString) pids)
+      return $ (id &&& (exposedModules . getPackageDetails pkgSt)) `fmap` mpid
+
+-- | Given a list of package names, build a mapping from module names to
+--   packages so we can look up what package provides a given module.
+buildModuleMap :: [String] -> IO ModuleMap
+buildModuleMap pkgs = do
+  pkgMods <- catMaybes `fmap` mapM getPkgModules pkgs
+  return . M.fromList . map swap . concat . map strength $ pkgMods
+ where strength (x,f) = fmap ((,) x) f
+
+-- To do:
+--   + handle linking to modules within multiple packages
+--   + linkify highlighted code (link to APIs)
+--   + automatically look up/insert type signatures
+--   + automatically typeset ghci sessions
+
+--   + automatically render embedded diagrams!
