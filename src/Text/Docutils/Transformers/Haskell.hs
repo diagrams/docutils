@@ -1,14 +1,19 @@
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeOperators
+           , PatternGuards
+           , Arrows
+  #-}
 
 module Text.Docutils.Transformers.Haskell where
 
 import GHC
+import Name
 import Packages
 import DynFlags
 import MonadUtils
 import Module
 import GHC.Paths (libdir)
 
+import Data.Char
 import Data.Maybe (listToMaybe, catMaybes, fromJust)
 import Data.List (isPrefixOf, intercalate)
 import qualified Data.Map as M
@@ -51,6 +56,38 @@ highlightBlockHS =
       += attr "class" (txt "examplesrc")
       += highlightBlockHSArr
 
+-- XXX todo:
+--   - Deal with encoding for operators etc.  E.g. proper link to (<>)
+--     is -60--62- or something like that
+--   - For things exported by multiple modules find the right one? E.g. right now
+--     atop is exported by Diagrams.Prelude but its documentation is not there
+--     since it is exported via a whole module
+
+linkifyHS :: (ArrowChoice (~>), ArrowXml (~>)) => NameMap -> ModuleMap -> XmlT (~>)
+linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell")] $
+                             linkifyHS'
+  where linkifyHS' = (isText >>> linkifyAll) `orElse` (processChildren linkifyHS')
+        linkifyAll = getText
+                 >>> arrL (split (condense $ oneOf " "))
+                 >>> linkify
+        linkify    = proc t -> do
+                       case M.lookup (stripSpecials t) nameMap of
+                         Nothing   -> mkText -< t
+                         Just modN ->
+                           mkText >>>
+                           mkLink
+                             (constA
+                               (mkAPILink modMap (Just (stripSpecials t))
+                                 (moduleNameString modN)
+                               )
+                             )              -<< t
+        stripSpecials ""       = ""
+        stripSpecials "("      = ""
+        stripSpecials "`"      = ""
+        stripSpecials ('(':t') = init t'
+        stripSpecials ('`':t') = init t'
+        stripSpecials t' = t'
+
 highlightBlockHSArr :: ArrowXml (~>) => XmlT (~>)
 highlightBlockHSArr =
   getChildren >>> getText >>> arr (litify >>> highlightHS []) >>> hread
@@ -81,49 +118,71 @@ linkifyModules :: ArrowXml (~>) => ModuleMap -> XmlT (~>)
 linkifyModules modMap =
   onElemA "literal" [("classes", "mod")] $
     removeAttr "classes" >>>
-    mkLink (getChildren >>> getText >>> arr (mkAPILink modMap))
+    mkLink (getChildren >>> getText >>> arr (mkAPILink modMap Nothing))
 
-mkAPILink :: ModuleMap -> String -> String
-mkAPILink modMap modName = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath
+mkAPILink :: ModuleMap -> Maybe String -> String -> String
+mkAPILink modMap mexp modName
+  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
   where modPath = map f modName ++ ".html"
         f '.' = '-'
         f x   = x
         pkg   = packageIdStringBase . fromJust $ M.lookup (mkModuleName modName) modMap
         -- XXX
+        expHash | Just e@(e1:_) <- mexp = case () of
+                    _ | isUpper e1 -> "#t:" ++ e
+                      | otherwise  -> "#v:" ++ e
+                | otherwise      = ""
 
 ------------------------------------------------------------
 --  Packages + modules
 ------------------------------------------------------------
 
+-- | A mapping from modules to packages.
 type ModuleMap = M.Map ModuleName PackageId
+
+-- | A mapping from exported names to modules.
+type NameMap = M.Map String ModuleName
 
 -- | Convert a 'PackageId' to a String without the trailing version number.
 packageIdStringBase :: PackageId -> String
 packageIdStringBase = intercalate "-" . init . splitOn "-" . packageIdString
 
 -- | Get the list of modules provided by a package.
-getPkgModules :: String -> IO (Maybe (PackageId, [ModuleName]))
+getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
 getPkgModules pkg =
   defaultErrorHandler defaultDynFlags $ do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       let dflags' = dflags { packageFlags = ExposePackage pkg : packageFlags dflags }
       (dflags'', pids) <- liftIO $ initPackages dflags'
-      let pkgSt   = pkgState dflags''
-          mpid    = listToMaybe (filter ((pkg `isPrefixOf`) . packageIdString) pids)
-      return $ (id &&& (exposedModules . getPackageDetails pkgSt)) `fmap` mpid
+      _ <- setSessionDynFlags dflags''
+      let pkgSt    = pkgState dflags''
+          mpid     = listToMaybe (filter ((pkg `isPrefixOf`) . packageIdString) pids)
+          mpkgMods = (id &&& (exposedModules . getPackageDetails pkgSt)) <$> mpid
+      case mpkgMods of
+        Nothing          -> return Nothing
+        Just (pkgid, ns) -> do
+          mis <- catMaybes <$>
+                   mapM (fmap strength . strength . (id &&& getModuleInfo . mkModule pkgid)) ns
+          return . Just $ (pkgid, mis)
 
 -- | Given a list of package names, build a mapping from module names to
 --   packages so we can look up what package provides a given module.
-buildModuleMap :: [String] -> IO ModuleMap
-buildModuleMap pkgs = do
-  pkgMods <- catMaybes `fmap` mapM getPkgModules pkgs
-  return . M.fromList . map swap . concat . map strength $ pkgMods
- where strength (x,f) = fmap ((,) x) f
+buildPackageMaps :: [String] -> IO (ModuleMap, NameMap)
+buildPackageMaps pkgs = do
+  pkgMods <- catMaybes <$> mapM getPkgModules pkgs
+  let pkgModPairs = concat . map strength $ pkgMods
+      modMap      = M.fromList . map (first fst . swap) $ pkgModPairs
+      nameMap     = M.fromList
+                    . (map . first) (occNameString . nameOccName)
+                    . concatMap (map swap . strength . second modInfoExports . snd)
+                    $ pkgModPairs
+  return (modMap, nameMap)
+
+strength :: Functor f => (a, f b) -> f (a, b)
+strength (x,f) = fmap ((,) x) f
+
 
 -- To do:
---   + linkify highlighted code (link to APIs)
 --   + automatically look up/insert type signatures
 --   + automatically typeset ghci sessions
-
---   + automatically render embedded diagrams!
