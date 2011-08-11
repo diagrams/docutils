@@ -103,7 +103,6 @@ buildModuleMap pkgs = do
  where strength (x,f) = fmap ((,) x) f
 
 -- To do:
---   + handle linking to modules within multiple packages
 --   + linkify highlighted code (link to APIs)
 --   + automatically look up/insert type signatures
 --   + automatically typeset ghci sessions
