@@ -41,7 +41,9 @@ linkifyHackage :: ArrowXml a => XmlT a
 linkifyHackage =
   onElemA "literal" [("classes", "pkg")] $
     removeAttr "classes" >>>
-    mkLink (getChildren >>> getText >>> arr (hackagePkgPrefix ++))
+    eelem "span"
+      += attr "class" (txt "package")
+      += mkLink (getChildren >>> getText >>> arr (hackagePkgPrefix ++))
 
 highlightInlineHS :: ArrowXml (~>) => XmlT (~>)
 highlightInlineHS =
@@ -118,7 +120,9 @@ linkifyModules :: ArrowXml (~>) => ModuleMap -> XmlT (~>)
 linkifyModules modMap =
   onElemA "literal" [("classes", "mod")] $
     removeAttr "classes" >>>
-    mkLink (getChildren >>> getText >>> arr (mkAPILink modMap Nothing))
+    eelem "span"
+      += attr "class" (txt "module")
+      += mkLink (getChildren >>> getText >>> arr (mkAPILink modMap Nothing))
 
 mkAPILink :: ModuleMap -> Maybe String -> String -> String
 mkAPILink modMap mexp modName
