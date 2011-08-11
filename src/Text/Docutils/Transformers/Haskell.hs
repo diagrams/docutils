@@ -38,14 +38,36 @@ linkifyHackage =
     removeAttr "classes" >>>
     mkLink (getChildren >>> getText >>> arr (hackagePkgPrefix ++))
 
-highlightHS :: ArrowXml (~>) => XmlTree ~> XmlTree
-highlightHS =
+highlightInlineHS :: ArrowXml (~>) => XmlT (~>)
+highlightInlineHS =
   onElemA "literal" [("classes", "hs")] $
     removeAttr "classes" >>>
-    getChildren >>> getText >>> arr highlight >>> hread
-  where highlight code = case highlightAs "haskell" code of
-                           Left   _ -> code
-                           Right ls -> showHtmlFragment (formatAsXHtml [OptInline] "haskell" ls)
+    getChildren >>> getText >>> arr (highlightHS [OptInline]) >>> hread
+
+highlightBlockHS :: ArrowXml (~>) => XmlT (~>)
+highlightBlockHS =
+  onElemA "raw" [("format", "lhs")] $
+    eelem "div"
+      += attr "class" (txt "examplesrc")
+      += highlightBlockHSArr
+
+highlightBlockHSArr :: ArrowXml (~>) => XmlT (~>)
+highlightBlockHSArr =
+  getChildren >>> getText >>> arr (litify >>> highlightHS []) >>> hread
+
+
+highlightHS :: [FormatOption] -> String -> String
+highlightHS opts code =
+  case highlightAs "LiterateHaskell" code of
+    Left   _ -> code
+    Right ls -> showHtmlFragment (formatAsXHtml opts "LiterateHaskell" ls)
+
+-- | If any lines begin with "> ", assume it is literate Haskell and
+--   leave it alone.  Otherwise, prefix every line with "> ".
+litify :: String -> String
+litify code | any ("> " `isPrefixOf`) ls = code
+            | otherwise = unlines . map ("> " ++) $ ls
+  where ls = lines code
 
 styleFile :: ArrowXml (~>) => String -> XmlT (~>)
 styleFile s =
@@ -54,9 +76,6 @@ styleFile s =
                           += attr "type" (txt "text/css")
                           += attr "href" (txt s)
             )
-
--- XXX option to give multiple packages and have it look up the
--- contents to determine where to link
 
 linkifyModules :: ArrowXml (~>) => ModuleMap -> XmlT (~>)
 linkifyModules modMap =
