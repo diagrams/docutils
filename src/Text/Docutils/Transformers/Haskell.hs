@@ -65,6 +65,10 @@ highlightBlockHS =
 --     atop is exported by Diagrams.Prelude but its documentation is not there
 --     since it is exported via a whole module
 
+--   - splitting on whitespace is not actually a good method of
+--     identifying things to link.  Really ought to use a proper
+--     parser.  The problem is that there can be markup in there
+--     already from the syntax highlighter.
 linkifyHS :: (ArrowChoice (~>), ArrowXml (~>)) => NameMap -> ModuleMap -> XmlT (~>)
 linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell")] $
                              linkifyHS'
