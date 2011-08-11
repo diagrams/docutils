@@ -20,6 +20,8 @@ xml2html = tSections >>>
            [ tDocument
            , tPara
            , tEmph
+           , tBulletList
+           , tListItem
              
            , tLiterals
              
@@ -95,3 +97,9 @@ tReference = onElem "reference" $
 
 tEmph :: ArrowXml (~>) => XmlT (~>)
 tEmph = replaceTag "emphasis" "em" []
+
+tBulletList :: ArrowXml (~>) => XmlT (~>)
+tBulletList = replaceTag "bullet_list" "ul" []
+
+tListItem :: ArrowXml (~>) => XmlT (~>)
+tListItem = replaceTag "list_item" "li" []
