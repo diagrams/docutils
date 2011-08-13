@@ -59,8 +59,6 @@ highlightBlockHS =
       += highlightBlockHSArr
 
 -- XXX todo:
---   - Deal with encoding for operators etc.  E.g. proper link to (<>)
---     is -60--62- or something like that
 --   - For things exported by multiple modules find the right one? E.g. right now
 --     atop is exported by Diagrams.Prelude but its documentation is not there
 --     since it is exported via a whole module
@@ -83,7 +81,7 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell
                            mkText >>>
                            mkLink
                              (constA
-                               (mkAPILink modMap (Just (stripSpecials t))
+                               (mkAPILink modMap (Just (encode (stripSpecials t)))
                                  (moduleNameString modN)
                                )
                              )              -<< t
@@ -93,6 +91,9 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell
         stripSpecials ('(':t') = init t'
         stripSpecials ('`':t') = init t'
         stripSpecials t' = t'
+        encode = concatMap encodeC
+        encodeC c | isAlphaNum c = [c]
+                  | otherwise    = '-' : show (ord c) ++ "-"
 
 highlightBlockHSArr :: ArrowXml (~>) => XmlT (~>)
 highlightBlockHSArr =
