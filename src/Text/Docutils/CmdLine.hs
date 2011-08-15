@@ -6,7 +6,7 @@ import System.Environment
 import System.Exit
 
 import Text.XML.HXT.Core
-import Text.XML.HXT.HTTP
+import Text.XML.HXT.Arrow.XmlState.SystemConfig (withSubstDTDEntities)
 
 -- XXX generalize this
 docutilsCmdLine :: IOSArrow XmlTree XmlTree -> IO ()
@@ -27,7 +27,11 @@ application	:: SysConfigList -> String -> String -> IOSArrow XmlTree XmlTree -> 
 application cfg src dst transf
     = configSysVars cfg
       >>>
-      readDocument [withValidate no, withHTTP []] src
+                     -- these options ensure it won't try to fetch the
+                     -- DTD over the network
+      readDocument [ withValidate no
+                   , withSubstDTDEntities no
+                   ] src
       >>>
       processChildren (transf `when` isElem)
       >>>
