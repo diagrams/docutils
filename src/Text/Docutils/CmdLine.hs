@@ -6,7 +6,6 @@ import System.Environment
 import System.Exit
 
 import Text.XML.HXT.Core
-import Text.XML.HXT.Arrow.XmlState.SystemConfig (withSubstDTDEntities)
 
 -- XXX generalize this
 docutilsCmdLine :: IOSArrow XmlTree XmlTree -> IO ()
