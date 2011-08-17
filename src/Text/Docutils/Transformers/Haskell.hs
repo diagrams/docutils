@@ -53,7 +53,7 @@ highlightInlineHS =
 
 highlightBlockHS :: ArrowXml (~>) => XmlT (~>)
 highlightBlockHS =
-  onElemA "raw" [("format", "lhs")] $
+  onElemA "literal_block" [("classes", "lhs")] $
     eelem "div"
       += attr "class" (txt "examplesrc")
       += highlightBlockHSArr
