@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeOperators
            , Rank2Types
            , TypeSynonymInstances
-           , NoMonomorphismRestriction 
+           , NoMonomorphismRestriction
   #-}
 
 module Text.Docutils.Writers.HTML where
@@ -16,7 +16,7 @@ import Text.Docutils.Util
 
 xml2html :: ArrowXml (~>) => XmlT (~>)
 xml2html = tSections >>>
-           doTransforms 
+           doTransforms
            [ tDocument
            , tPara
            , tEmph
@@ -24,7 +24,7 @@ xml2html = tSections >>>
            , tListItem
              
            , tLiterals
-             
+
            , tTitleRef
            , tReference
            ]
@@ -36,8 +36,8 @@ xml2html = tSections >>>
 tSections :: ArrowXml (~>) => XmlT (~>)
 tSections = tSections' (1 :: Integer)
   where tSections' n       = titleSection n `orElse` processChildren (tSections' n)
-        titleSection n     = isTag "section" >>> 
-                             mkelem "div" 
+        titleSection n     = isTag "section" >>>
+                             mkelem "div"
                                [ attr "class" (txt "section")
                                , attr "id" (getAttrValue "ids" >>> mkText)
                                ]
@@ -52,9 +52,9 @@ tSections = tSections' (1 :: Integer)
 ------------------------------------------------------------
 
 tDocument :: ArrowXml (~>) => XmlT (~>)
-tDocument = onElem "document" $ 
-              selem "html" 
-              [ selem "head" 
+tDocument = onElem "document" $
+              selem "html"
+              [ selem "head"
                 [ selem "title" [getChildren >>> hasName "title" >>> getChildren]
                 ]
               , selem "body"
@@ -68,11 +68,11 @@ tDocument = onElem "document" $
                     )
                   ]
                 ]
-              ]  
+              ]
 
 tLiterals :: ArrowXml (~>) => XmlT (~>)
 tLiterals = replaceTag "literal" "code" []
-        
+
 tPara :: ArrowXml (~>) => XmlT (~>)
 tPara = replaceTag "paragraph" "p" []
 
