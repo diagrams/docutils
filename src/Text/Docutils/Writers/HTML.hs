@@ -22,7 +22,8 @@ xml2html = tSections >>>
            , tEmph
            , tBulletList
            , tListItem
-             
+           , tContainer
+
            , tLiterals
 
            , tTitleRef
@@ -103,3 +104,9 @@ tBulletList = replaceTag "bullet_list" "ul" []
 
 tListItem :: ArrowXml (~>) => XmlT (~>)
 tListItem = replaceTag "list_item" "li" []
+
+tContainer :: ArrowXml (~>) => XmlT (~>)
+tContainer = onElem "container" $
+  eelem "div"
+    += attr "class" (getAttrValue "classes" >>> mkText)
+    += getChildren
