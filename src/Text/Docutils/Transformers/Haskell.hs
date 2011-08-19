@@ -136,7 +136,10 @@ mkAPILink modMap mexp modName
         f '.' = '-'
         f x   = x
         pkg   = packageIdStringBase . fromJust $ M.lookup (mkModuleName modName) modMap
-        -- XXX
+        -- XXX fix me!!!  Should not use fromJust, rather insert some
+        -- kind of error marker if the module is not found.  Need to
+        -- pull this processing out of mkAPILink since at this point it is too late.
+        -- See implementation of linkifyHS for inspiration.
         expHash | Just e@(e1:_) <- mexp = case () of
                     _ | isUpper e1 -> "#t:" ++ e
                       | otherwise  -> "#v:" ++ e
