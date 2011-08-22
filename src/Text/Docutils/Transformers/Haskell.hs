@@ -20,7 +20,6 @@ import qualified Data.Map as M
 
 import Data.List.Split
 
-import qualified Control.Category as C
 import Control.Arrow
 
 import Text.XML.HXT.Core
@@ -112,14 +111,6 @@ litify :: String -> String
 litify code | any ("> " `isPrefixOf`) ls = code
             | otherwise = unlines . map ("> " ++) $ ls
   where ls = lines code
-
-styleFile :: ArrowXml (~>) => String -> XmlT (~>)
-styleFile s =
-  onElem "head" $
-    C.id += (eelem "link" += attr "rel" (txt "stylesheet")
-                          += attr "type" (txt "text/css")
-                          += attr "href" (txt s)
-            )
 
 linkifyModules :: ArrowXml (~>) => ModuleMap -> XmlT (~>)
 linkifyModules modMap =

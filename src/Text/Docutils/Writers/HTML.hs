@@ -7,6 +7,7 @@
 module Text.Docutils.Writers.HTML where
 
 import Text.XML.HXT.Core
+import qualified Control.Category as C
 
 import Text.Docutils.Util
 
@@ -110,3 +111,15 @@ tContainer = onElem "container" $
   eelem "div"
     += attr "class" (getAttrValue "classes" >>> mkText)
     += getChildren
+    
+------------------------------------------------------------
+-- Utilities
+------------------------------------------------------------
+
+styleFile :: ArrowXml (~>) => String -> XmlT (~>)
+styleFile s =
+  onElem "head" $
+    C.id += (eelem "link" += attr "rel" (txt "stylesheet")
+                          += attr "type" (txt "text/css")
+                          += attr "href" (txt s)
+            )
