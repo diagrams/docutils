@@ -118,13 +118,13 @@ tListItem :: ArrowXml (~>) => XmlT (~>)
 tListItem = replaceTag "list_item" "li" []
 
 -- XXX fix me 
---   1. look for paragraphs containing only a single <math>
---      node and replace with \[ \]
---   2. advanced -- merge with previous and next paragraphs if present
+--   2. merge with previous and next paragraphs if present
 tDispMath :: ArrowXml (~>) => XmlT (~>)
 tDispMath = onElem "paragraph" $
-  onElemA "math" [("classes", "dmath")] $
-  getChildren >>> getText >>> arr (("\\[" ++) . (++ "\\]")) >>> mkText
+  (getChildren >>> getChildren >>> getText >>> arr (("\\[" ++) . (++ "\\]")) >>> mkText)
+  `when`
+  (listA getChildren >>> isA ((==1) . length) >>> unlistA 
+    >>> isElem >>> hasName "math")
 
 tMath :: ArrowXml (~>) => XmlT (~>)
 tMath = onElem "math" $ 
