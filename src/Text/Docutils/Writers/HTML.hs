@@ -28,6 +28,7 @@ xml2html = tSections >>>
            , tContainer
 
            , tLiterals
+           , tLiteralBlocks
 
            , tTitleRef
            , tReference
@@ -79,6 +80,11 @@ tDocument = onElem "document" $
 
 tLiterals :: ArrowXml (~>) => XmlT (~>)
 tLiterals = replaceTag "literal" "code" []
+
+tLiteralBlocks :: ArrowXml (~>) => XmlT (~>)
+tLiteralBlocks = onElem "literal_block" $
+  eelem "pre"
+    += (eelem "code" += getChildren)
 
 tPara :: ArrowXml (~>) => XmlT (~>)
 tPara = replaceTag "paragraph" "p" []
