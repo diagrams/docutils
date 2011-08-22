@@ -19,10 +19,12 @@ xml2html :: ArrowXml (~>) => XmlT (~>)
 xml2html = tSections >>>
            doTransforms
            [ tDocument
+           , tDispMath
            , tPara
            , tEmph
            , tBulletList
            , tListItem
+           , tMath
            , tContainer
 
            , tLiterals
@@ -58,6 +60,9 @@ tDocument = onElem "document" $
               selem "html"
               [ selem "head"
                 [ selem "title" [getChildren >>> hasName "title" >>> getChildren]
+                , eelem "script"
+                    += attr "type" (txt "text/javascript")
+                    += attr "src" (txt "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML")
                 ]
               , selem "body"
                 [ mkelem "div"
@@ -105,6 +110,19 @@ tBulletList = replaceTag "bullet_list" "ul" []
 
 tListItem :: ArrowXml (~>) => XmlT (~>)
 tListItem = replaceTag "list_item" "li" []
+
+-- XXX fix me 
+--   1. look for paragraphs containing only a single <math>
+--      node and replace with \[ \]
+--   2. advanced -- merge with previous and next paragraphs if present
+tDispMath :: ArrowXml (~>) => XmlT (~>)
+tDispMath = onElem "paragraph" $
+  onElemA "math" [("classes", "dmath")] $
+  getChildren >>> getText >>> arr (("\\[" ++) . (++ "\\]")) >>> mkText
+
+tMath :: ArrowXml (~>) => XmlT (~>)
+tMath = onElem "math" $ 
+  getChildren >>> getText >>> arr (("\\(" ++) . (++ "\\)")) >>> mkText
 
 tContainer :: ArrowXml (~>) => XmlT (~>)
 tContainer = onElem "container" $
