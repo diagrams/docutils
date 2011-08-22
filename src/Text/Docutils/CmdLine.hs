@@ -34,7 +34,7 @@ application cfg src dst transf
       >>>
       processChildren (transf `when` isElem)
       >>>
-      writeDocument [] dst
+      writeDocument [withOutputXHTML] dst
       >>>
       getErrStatus
 
