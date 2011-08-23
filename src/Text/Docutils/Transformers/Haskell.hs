@@ -5,6 +5,8 @@
 
 module Text.Docutils.Transformers.Haskell where
 
+-- import Debug.Trace
+
 import GHC
 import Name
 import Packages
@@ -126,7 +128,7 @@ mkAPILink modMap mexp modName
   where modPath = map f modName ++ ".html"
         f '.' = '-'
         f x   = x
-        pkg   = packageIdStringBase . fromJust $ M.lookup (mkModuleName modName) modMap
+        pkg   = packageIdStringBase . fromJust {- . traceShow modName -} $ M.lookup (mkModuleName modName) modMap
         -- XXX fix me!!!  Should not use fromJust, rather insert some
         -- kind of error marker if the module is not found.  Need to
         -- pull this processing out of mkAPILink since at this point it is too late.
