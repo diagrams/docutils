@@ -23,6 +23,7 @@ xml2html = tSections >>>
            , tPara
            , tEmph
            , tBulletList
+           , tEnumList
            , tListItem
            , tMath
            , tContainer
@@ -113,6 +114,9 @@ tEmph = replaceTag "emphasis" "em" []
 
 tBulletList :: ArrowXml (~>) => XmlT (~>)
 tBulletList = replaceTag "bullet_list" "ul" []
+
+tEnumList :: ArrowXml (~>) => XmlT (~>)
+tEnumList = replaceTag "enumerated_list" "ol" []
 
 tListItem :: ArrowXml (~>) => XmlT (~>)
 tListItem = replaceTag "list_item" "li" []
