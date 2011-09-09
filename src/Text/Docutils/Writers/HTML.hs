@@ -21,6 +21,7 @@ xml2html = tSections >>>
            [ tDocument
            , tDispMath
            , tPara
+           , tWarning
            , tEmph
            , tBulletList
            , tEnumList
@@ -89,6 +90,12 @@ tLiteralBlocks = onElem "literal_block" $
 
 tPara :: ArrowXml (~>) => XmlT (~>)
 tPara = replaceTag "paragraph" "p" []
+
+tWarning :: ArrowXml (~>) => XmlT (~>)
+tWarning = onElem "warning" $
+  eelem "div"
+    += attr "class" (txt "warning")
+    += getChildren
 
 tTitleRef :: ArrowXml (~>) => XmlT (~>)
 tTitleRef = replaceTag "title_reference" "cite" []
