@@ -33,6 +33,8 @@ xml2html = tSections >>>
 
            , tTitleRef
            , tReference
+
+           , tEmDash
            ]
 
 ------------------------------------------------------------
@@ -139,7 +141,13 @@ tContainer = onElem "container" $
   eelem "div"
     += attr "class" (getAttrValue "classes" >>> mkText)
     += getChildren
-    
+
+tEmDash :: ArrowXml (~>) => XmlT (~>)
+tEmDash = (getText >>> arr mkEmDashes >>> mkText) `when` isText
+  where mkEmDashes [] = []
+        mkEmDashes ('-':'-':'-':t) = '—' : mkEmDashes t
+        mkEmDashes (c:t)           = c   : mkEmDashes t
+
 ------------------------------------------------------------
 -- Utilities
 ------------------------------------------------------------
