@@ -19,6 +19,7 @@ xml2html :: ArrowXml (~>) => XmlT (~>)
 xml2html = tSections >>>
            doTransforms
            [ tDocument
+           , tTopic
            , tDispMath
            , tPara
            , tEmph
@@ -73,6 +74,13 @@ tDocument = onElem "document" $
                     [ getChildren ]
                   )
                 ]
+
+tTopic :: ArrowXml (~>) => XmlT (~>)
+tTopic = onElem "topic" $
+  eelem "div"
+    += attr "class" (getAttrValue "classes" >>> mkText)
+    += attr "id"    (getAttrValue "ids" >>> mkText)
+    += getChildren
 
 tLiterals :: ArrowXml (~>) => XmlT (~>)
 tLiterals = replaceTag "literal" "code" []
