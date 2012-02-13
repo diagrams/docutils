@@ -59,27 +59,20 @@ tSections = tSections' (1 :: Integer)
 --  Atomic transformations
 ------------------------------------------------------------
 
+-- XXX need to generalize this to allow generating both standalone and
+-- fragments
+
 tDocument :: ArrowXml (~>) => XmlT (~>)
 tDocument = onElem "document" $
-              selem "html"
-              [ selem "head"
-                [ selem "title" [getChildren >>> hasName "title" >>> getChildren]
-                , eelem "script"
-                    += attr "type" (txt "text/javascript")
-                    += attr "src" (txt "http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML")
+                mkelem "div"
+                [ attr "class" (txt "document") ]
+                [ getChildren >>>
+                  ( onElem "title" $
+                    mkelem "h1"
+                    [ attr "class" (txt "title") ]
+                    [ getChildren ]
+                  )
                 ]
-              , selem "body"
-                [ mkelem "div"
-                  [ attr "class" (txt "document") ]
-                  [ getChildren >>>
-                    ( onElem "title" $
-                      mkelem "h1"
-                      [ attr "class" (txt "title") ]
-                      [ getChildren ]
-                    )
-                  ]
-                ]
-              ]
 
 tLiterals :: ArrowXml (~>) => XmlT (~>)
 tLiterals = replaceTag "literal" "code" []
