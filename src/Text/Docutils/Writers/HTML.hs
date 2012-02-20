@@ -124,17 +124,17 @@ tEnumList = replaceTag "enumerated_list" "ol" []
 tListItem :: ArrowXml (~>) => XmlT (~>)
 tListItem = replaceTag "list_item" "li" []
 
--- XXX fix me 
+-- XXX fix me
 --   2. merge with previous and next paragraphs if present
 tDispMath :: ArrowXml (~>) => XmlT (~>)
 tDispMath = onElem "paragraph" $
   (getChildren >>> getChildren >>> getText >>> arr (("\\[" ++) . (++ "\\]")) >>> mkText)
   `when`
-  (listA getChildren >>> isA ((==1) . length) >>> unlistA 
+  (listA getChildren >>> isA ((==1) . length) >>> unlistA
     >>> isElem >>> hasName "math")
 
 tMath :: ArrowXml (~>) => XmlT (~>)
-tMath = onElem "math" $ 
+tMath = onElem "math" $
   getChildren >>> getText >>> arr (("\\(" ++) . (++ "\\)")) >>> mkText
 
 tContainer :: ArrowXml (~>) => XmlT (~>)
