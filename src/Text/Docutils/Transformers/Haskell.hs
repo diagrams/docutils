@@ -155,7 +155,7 @@ packageIdStringBase = intercalate "-" . init . splitOn "-" . packageIdString
 -- | Get the list of modules provided by a package.
 getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
 getPkgModules pkg =
-  defaultErrorHandler defaultDynFlags $ do
+  defaultErrorHandler defaultLogAction $ do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       let dflags' = dflags { packageFlags = ExposePackage pkg : packageFlags dflags }
