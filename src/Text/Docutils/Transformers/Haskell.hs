@@ -122,9 +122,12 @@ linkifyModules modMap =
       += attr "class" (txt "module")
       += mkLink (getChildren >>> getText >>> arr (mkAPILink modMap Nothing))
 
+-- XXX generalize this...
+
 mkAPILink :: ModuleMap -> Maybe String -> String -> String
 mkAPILink modMap mexp modName
-  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
+--  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
+  = "/doc/" ++ modPath ++ expHash   -- for linking to local API reference
   where modPath = map f modName ++ ".html"
         f '.' = '-'
         f x   = x
