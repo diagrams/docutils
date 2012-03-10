@@ -19,6 +19,7 @@ xml2html :: ArrowXml (~>) => XmlT (~>)
 xml2html = tSections >>>
            doTransforms
            [ tDocument
+           , tTitle
            , tTopic
            , tDispMath
            , tPara
@@ -26,6 +27,7 @@ xml2html = tSections >>>
            , tBulletList
            , tEnumList
            , tListItem
+           , tBlockquote
            , tMath
            , tContainer
 
@@ -34,6 +36,7 @@ xml2html = tSections >>>
 
            , tTitleRef
            , tReference
+           , tTarget
 
            , tEmDash
            ]
@@ -75,6 +78,10 @@ tDocument = onElem "document" $
                   )
                 ]
 
+-- replace any leftover title tags
+tTitle :: ArrowXml (~>) => XmlT (~>)
+tTitle = replaceTag "title" "h2" []
+
 tTopic :: ArrowXml (~>) => XmlT (~>)
 tTopic = onElem "topic" $
   eelem "div"
@@ -112,6 +119,9 @@ tReference = onElem "reference" $
      ]
     )
 
+tTarget :: ArrowXml (~>) => XmlT (~>)
+tTarget = onElem "target" $ txt ""
+
 tEmph :: ArrowXml (~>) => XmlT (~>)
 tEmph = replaceTag "emphasis" "em" []
 
@@ -123,6 +133,9 @@ tEnumList = replaceTag "enumerated_list" "ol" []
 
 tListItem :: ArrowXml (~>) => XmlT (~>)
 tListItem = replaceTag "list_item" "li" []
+
+tBlockquote :: ArrowXml (~>) => XmlT (~>)
+tBlockquote = replaceTag "block_quote" "blockquote" []
 
 -- XXX fix me
 --   2. merge with previous and next paragraphs if present
