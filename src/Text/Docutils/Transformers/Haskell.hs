@@ -7,29 +7,30 @@ module Text.Docutils.Transformers.Haskell where
 
 -- import Debug.Trace
 
-import GHC
-import Name
-import Packages
-import DynFlags
-import MonadUtils
-import Module
-import GHC.Paths (libdir)
+import           GHC
+import           Name
+import           Packages
+import           DynFlags
+import           MonadUtils
+import           Module
+import           GHC.Paths (libdir)
 
-import Data.Char
-import Data.Maybe (listToMaybe, catMaybes, fromJust)
-import Data.List (isPrefixOf, intercalate)
+import           Data.Char
+import           Data.Maybe (listToMaybe, catMaybes, fromJust)
+import           Data.List (isPrefixOf, intercalate)
 import qualified Data.Map as M
 
-import Data.List.Split
+import           Data.List.Split
 
-import Control.Arrow
+import           Control.Arrow
 
-import Text.XML.HXT.Core
+import           Text.XML.HXT.Core
 
-import Text.Highlighting.Kate
-import Text.XHtml.Strict
+import           Text.Blaze.Html.Renderer.String
+import           Text.Highlighting.Kate
+import           Text.Highlighting.Kate.Format.HTML
 
-import Text.Docutils.Util
+import           Text.Docutils.Util
 
 hackagePkgPrefix :: String
 hackagePkgPrefix = "http://hackage.haskell.org/package/"
@@ -50,7 +51,7 @@ highlightInlineHS :: ArrowXml (~>) => XmlT (~>)
 highlightInlineHS =
   onElemA "literal" [("classes", "hs")] $
     removeAttr "classes" >>>
-    getChildren >>> getText >>> arr (highlightHS [OptInline]) >>> hread
+    getChildren >>> getText >>> arr (highlightHS defaultFormatOpts) >>> hread
 
 highlightBlockHS :: ArrowXml (~>) => XmlT (~>)
 highlightBlockHS =
@@ -98,14 +99,12 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell
 
 highlightBlockHSArr :: ArrowXml (~>) => XmlT (~>)
 highlightBlockHSArr =
-  getChildren >>> getText >>> arr (litify >>> highlightHS []) >>> hread
+  getChildren >>> getText >>> arr (litify >>> highlightHS defaultFormatOpts) >>> hread
 
 
-highlightHS :: [FormatOption] -> String -> String
-highlightHS opts code =
-  case highlightAs "LiterateHaskell" code of
-    Left   _ -> code
-    Right ls -> showHtmlFragment (formatAsXHtml opts "LiterateHaskell" ls)
+highlightHS :: FormatOptions -> String -> String
+highlightHS opts =
+  renderHtml . formatHtmlInline opts . highlightAs "LiterateHaskell"
 
 -- | If any lines begin with "> ", assume it is literate Haskell and
 --   leave it alone.  Otherwise, prefix every line with "> ".
