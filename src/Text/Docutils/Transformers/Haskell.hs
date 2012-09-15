@@ -51,7 +51,7 @@ highlightInlineHS :: ArrowXml (~>) => XmlT (~>)
 highlightInlineHS =
   onElemA "literal" [("classes", "hs")] $
     removeAttr "classes" >>>
-    getChildren >>> getText >>> arr (highlightHS defaultFormatOpts) >>> hread
+    getChildren >>> getText >>> arr highlightHSInline >>> hread
 
 highlightBlockHS :: ArrowXml (~>) => XmlT (~>)
 highlightBlockHS =
@@ -99,12 +99,13 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell
 
 highlightBlockHSArr :: ArrowXml (~>) => XmlT (~>)
 highlightBlockHSArr =
-  getChildren >>> getText >>> arr (litify >>> highlightHS defaultFormatOpts) >>> hread
+  getChildren >>> getText >>> arr (litify >>> highlightHSBlock) >>> hread
 
+highlightHSInline = highlightHS defaultFormatOpts formatHtmlInline
+highlightHSBlock  = highlightHS defaultFormatOpts formatHtmlBlock
 
-highlightHS :: FormatOptions -> String -> String
-highlightHS opts =
-  renderHtml . formatHtmlInline opts . highlightAs "LiterateHaskell"
+highlightHS opts fmt =
+  renderHtml . fmt opts . highlightAs "LiterateHaskell"
 
 -- | If any lines begin with "> ", assume it is literate Haskell and
 --   leave it alone.  Otherwise, prefix every line with "> ".
