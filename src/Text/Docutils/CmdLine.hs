@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Text.Docutils.CmdLine where
@@ -5,36 +6,46 @@ module Text.Docutils.CmdLine where
 import System.Environment
 import System.Exit
 
+import System.Console.CmdArgs
 import Text.XML.HXT.Core
 
--- XXX generalize this
-docutilsCmdLine :: IOSArrow XmlTree XmlTree -> IO ()
+data DocutilOpts = DocutilOpts
+  { outputDir  :: FilePath
+  , sourceFile :: FilePath
+  , destFile   :: FilePath
+  }
+  deriving (Data, Typeable)
+
+docutils :: DocutilOpts
+docutils = DocutilOpts
+  { outputDir  = def &= typDir &= help "Output directory for generated files."
+  , sourceFile = def &= argPos 0
+  , destFile   = def &= argPos 1
+  }
+
+docutilsCmdLine :: (FilePath -> IOSArrow XmlTree XmlTree) -> IO ExitCode
 docutilsCmdLine transf = do
-  argv <- getArgs
-  (al, src, dst) <- cmdlineOpts argv
-  [rc]  <- runX (application al src dst transf)
+  opts <- cmdArgs docutils
+  [rc] <- runX (application [withValidate no] opts transf)
   if rc >= c_err
-    then exitWith (ExitFailure (0-1))
-    else exitWith ExitSuccess
- 
--- XXX use CmdArgs
-cmdlineOpts 	:: [String] -> IO (SysConfigList, String, String)
-cmdlineOpts argv
-    = return ([withValidate no], argv!!0, argv!!1)
- 
-application	:: SysConfigList -> String -> String -> IOSArrow XmlTree XmlTree -> IOSArrow b Int
-application cfg src dst transf
+    then return (ExitFailure (0-1))
+    else return ExitSuccess
+
+application :: SysConfigList
+            -> DocutilOpts
+            -> (FilePath -> IOSArrow XmlTree XmlTree)
+            -> IOSArrow b Int
+application cfg opts transf
     = configSysVars cfg
       >>>
                      -- these options ensure it won't try to fetch the
                      -- DTD over the network
       readDocument [ withValidate no
                    , withSubstDTDEntities no
-                   ] src
+                   ] (sourceFile opts)
       >>>
-      processChildren (transf `when` isElem)
+      processChildren (transf (outputDir opts) `when` isElem)
       >>>
-      writeDocument [withOutputXHTML] dst
+      writeDocument [withOutputXHTML] (destFile opts)
       >>>
       getErrStatus
-
