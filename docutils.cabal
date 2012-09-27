@@ -7,14 +7,15 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Brent Yorgey
 Maintainer:          byorgey@cis.upenn.edu
+Bug-reports:         http://github.com/diagrams/docutils/issues
 Category:            Text
 Build-type:          Simple
-Cabal-version:       >=1.6
+Cabal-version:       >=1.10
 Extra-source-files:  CHANGES
 Tested-with:         GHC == 7.2.1, GHC == 7.4.1
 Source-repository head
-  type:     darcs
-  location: http://code.haskell.org/~byorgey/code/docutils
+  type:     git
+  location: http://github.com/diagrams/docutils.git
 
 Library
   Exposed-modules:     Text.Docutils.CmdLine, 
@@ -33,3 +34,5 @@ Library
                        cmdargs >= 0.10 && < 0.11
 
   hs-source-dirs:      src
+
+  default-language:    Haskell2010
