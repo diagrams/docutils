@@ -27,7 +27,7 @@ Library
                        ghc-paths >= 0.1 && < 0.2,
                        ghc >= 7.2 && < 7.5,
                        containers >= 0.4 && < 0.6,
-                       hxt >= 9.1.4 && < 9.3,
+                       hxt >= 9.1.4 && < 9.4,
                        highlighting-kate >= 0.5 && < 0.6,
                        blaze-html >= 0.5 && < 0.6,
                        split >= 0.1 && < 0.3,
