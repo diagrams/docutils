@@ -47,13 +47,13 @@ linkifyHackage =
       += attr "class" (txt "package")
       += mkLink (getChildren >>> getText >>> arr (hackagePkgPrefix ++))
 
-highlightInlineHS :: ArrowXml (~>) => XmlT (~>)
+highlightInlineHS :: ArrowXml a => XmlT a
 highlightInlineHS =
   onElemA "literal" [("classes", "hs")] $
     removeAttr "classes" >>>
     getChildren >>> getText >>> arr highlightHSInline >>> hread
 
-highlightBlockHS :: ArrowXml (~>) => XmlT (~>)
+highlightBlockHS :: ArrowXml a => XmlT a
 highlightBlockHS =
   onElemA "literal_block" [("classes", "lhs")] $
     eelem "div"
@@ -69,7 +69,7 @@ highlightBlockHS =
 --     identifying things to link.  Really ought to use a proper
 --     parser.  The problem is that there can be markup in there
 --     already from the syntax highlighter.
-linkifyHS :: (ArrowChoice (~>), ArrowXml (~>)) => NameMap -> ModuleMap -> XmlT (~>)
+linkifyHS :: (ArrowChoice a, ArrowXml a) => NameMap -> ModuleMap -> XmlT a
 linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell")] $
                              linkifyHS'
   where linkifyHS' = (isText >>> linkifyAll) `orElse` (processChildren linkifyHS')
@@ -97,7 +97,7 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell
         encodeC c | isAlphaNum c = [c]
                   | otherwise    = '-' : show (ord c) ++ "-"
 
-highlightBlockHSArr :: ArrowXml (~>) => XmlT (~>)
+highlightBlockHSArr :: ArrowXml a => XmlT a
 highlightBlockHSArr =
   getChildren >>> getText >>> arr (litify >>> highlightHSBlock) >>> hread
 
@@ -114,7 +114,7 @@ litify code | any ("> " `isPrefixOf`) ls = code
             | otherwise = unlines . map ("> " ++) $ ls
   where ls = lines code
 
-linkifyModules :: ArrowXml (~>) => ModuleMap -> XmlT (~>)
+linkifyModules :: ArrowXml a => ModuleMap -> XmlT a
 linkifyModules modMap =
   onElemA "literal" [("classes", "mod")] $
     removeAttr "classes" >>>
