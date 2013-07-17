@@ -2,40 +2,40 @@
 
 module Text.Docutils.Util where
 
-import Text.XML.HXT.Core
+import           Text.XML.HXT.Core
 
-import qualified Control.Category as C
+import qualified Control.Category  as C
 
-type XmlT (~>) = XmlTree ~> XmlTree
+type XmlT a = XmlTree `a` XmlTree
 
-doTransforms :: ArrowXml (~>) => [XmlT (~>)] -> XmlT (~>)
+doTransforms :: ArrowXml a => [XmlT a] -> XmlT a
 doTransforms ts = doAll (map processTopDown ts)
 
-doAll :: ArrowXml (~>) => [XmlT (~>)] -> XmlT (~>)
+doAll :: ArrowXml a => [XmlT a] -> XmlT a
 doAll = foldr (>>>) C.id
 
-onElem :: ArrowXml (~>) => String -> XmlT (~>) -> XmlT (~>)
+onElem :: ArrowXml a => String -> XmlT a -> XmlT a
 onElem e trans = trans `when` isTag e
 
-onElemA :: ArrowXml (~>) => String -> [(String, String)] -> XmlT (~>) -> XmlT (~>)
+onElemA :: ArrowXml a => String -> [(String, String)] -> XmlT a -> XmlT a
 onElemA e attrs trans = trans `when` isTagA e attrs
 
-isTag :: ArrowXml (~>) => String -> XmlT (~>)
+isTag :: ArrowXml a => String -> XmlT a
 isTag e = isElem >>> hasName e
 
-hasAttrVal :: ArrowXml (~>) => String -> String -> XmlT (~>)
+hasAttrVal :: ArrowXml a => String -> String -> XmlT a
 hasAttrVal a v = (hasAttr a >>> getAttrValue a >>> isA (== v)) `guards` C.id
 
-isTagA :: ArrowXml (~>) => String -> [(String, String)] -> XmlT (~>)
+isTagA :: ArrowXml a => String -> [(String, String)] -> XmlT a
 isTagA e attrs = isTag e >>> doAll (map (uncurry hasAttrVal) attrs)
 
-replaceTag :: ArrowXml (~>) => String -> String -> [XmlT (~>)] -> XmlT (~>)
+replaceTag :: ArrowXml a => String -> String -> [XmlT a] -> XmlT a
 replaceTag t1 t2 attrs = onElem t1 (setTag t2 attrs)
 
-setTag :: ArrowXml (~>) => String -> [XmlT (~>)] -> XmlT (~>)
+setTag :: ArrowXml a => String -> [XmlT a] -> XmlT a
 setTag t attrs = mkelem t attrs [getChildren]
 
-mkLink :: ArrowXml (~>) => (XmlTree ~> String) -> XmlT (~>)
+mkLink :: ArrowXml a => (XmlTree `a` String) -> XmlT a
 mkLink uri = mkelem "a"
              [ attr "href" (uri >>> mkText) ]
              [ C.id ]

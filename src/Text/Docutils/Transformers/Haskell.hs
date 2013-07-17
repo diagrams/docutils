@@ -1,36 +1,50 @@
-{-# LANGUAGE TypeOperators
-           , PatternGuards
-           , Arrows
-  #-}
+{-# LANGUAGE Arrows        #-}
+{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Text.Docutils.Transformers.Haskell where
 
 -- import Debug.Trace
 
-import           GHC
-import           Name
-import           Packages
-import           DynFlags
-import           MonadUtils
-import           Module
-import           GHC.Paths (libdir)
+import           DynFlags                        (PackageFlag (ExposePackage),
+                                                  defaultFatalMessager,
+                                                  defaultFlushOut)
+import           GHC                             (ModuleInfo,
+                                                  defaultErrorHandler,
+                                                  getModuleInfo,
+                                                  getSessionDynFlags,
+                                                  modInfoExports, packageFlags,
+                                                  pkgState, runGhc,
+                                                  setSessionDynFlags)
+import           GHC.Paths                       (libdir)
+import           Module                          (ModuleName, PackageId,
+                                                  mkModule, mkModuleName,
+                                                  moduleNameString,
+                                                  packageIdString)
+import           MonadUtils                      (liftIO)
+import           Name                            (nameOccName, occNameString)
+import           Packages                        (exposedModules,
+                                                  getPackageDetails,
+                                                  initPackages)
 
+import           Control.Applicative             ((<$>))
 import           Data.Char
-import           Data.Maybe (listToMaybe, catMaybes, fromJust)
-import           Data.List (isPrefixOf, intercalate)
-import qualified Data.Map as M
+import           Data.List                       (intercalate, isPrefixOf)
+import qualified Data.Map                        as M
+import           Data.Maybe                      (catMaybes, fromJust,
+                                                  listToMaybe)
 
-import           Data.List.Split
-
-import           Control.Arrow
+import           Data.List.Split                 (condense, oneOf, split,
+                                                  splitOn)
 
 import           Text.XML.HXT.Core
 
-import           Text.Blaze.Html.Renderer.String
-import           Text.Highlighting.Kate
-import           Text.Highlighting.Kate.Format.HTML
+import           Text.Blaze.Html.Renderer.String (renderHtml)
+import           Text.Highlighting.Kate          (defaultFormatOpts,
+                                                  formatHtmlBlock,
+                                                  formatHtmlInline, highlightAs)
 
-import           Text.Docutils.Util
+import           Text.Docutils.Util              (XmlT, mkLink, onElemA)
 
 hackagePkgPrefix :: String
 hackagePkgPrefix = "http://hackage.haskell.org/package/"
@@ -47,13 +61,13 @@ linkifyHackage =
       += attr "class" (txt "package")
       += mkLink (getChildren >>> getText >>> arr (hackagePkgPrefix ++))
 
-highlightInlineHS :: ArrowXml (~>) => XmlT (~>)
+highlightInlineHS :: ArrowXml a => XmlT a
 highlightInlineHS =
   onElemA "literal" [("classes", "hs")] $
     removeAttr "classes" >>>
     getChildren >>> getText >>> arr highlightHSInline >>> hread
 
-highlightBlockHS :: ArrowXml (~>) => XmlT (~>)
+highlightBlockHS :: ArrowXml a => XmlT a
 highlightBlockHS =
   onElemA "literal_block" [("classes", "lhs")] $
     eelem "div"
@@ -69,7 +83,7 @@ highlightBlockHS =
 --     identifying things to link.  Really ought to use a proper
 --     parser.  The problem is that there can be markup in there
 --     already from the syntax highlighter.
-linkifyHS :: (ArrowChoice (~>), ArrowXml (~>)) => NameMap -> ModuleMap -> XmlT (~>)
+linkifyHS :: (ArrowChoice a, ArrowXml a) => NameMap -> ModuleMap -> XmlT a
 linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell")] $
                              linkifyHS'
   where linkifyHS' = (isText >>> linkifyAll) `orElse` (processChildren linkifyHS')
@@ -97,7 +111,7 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell
         encodeC c | isAlphaNum c = [c]
                   | otherwise    = '-' : show (ord c) ++ "-"
 
-highlightBlockHSArr :: ArrowXml (~>) => XmlT (~>)
+highlightBlockHSArr :: ArrowXml a => XmlT a
 highlightBlockHSArr =
   getChildren >>> getText >>> arr (litify >>> highlightHSBlock) >>> hread
 
@@ -114,7 +128,7 @@ litify code | any ("> " `isPrefixOf`) ls = code
             | otherwise = unlines . map ("> " ++) $ ls
   where ls = lines code
 
-linkifyModules :: ArrowXml (~>) => ModuleMap -> XmlT (~>)
+linkifyModules :: ArrowXml a => ModuleMap -> XmlT a
 linkifyModules modMap =
   onElemA "literal" [("classes", "mod")] $
     removeAttr "classes" >>>
@@ -158,7 +172,7 @@ packageIdStringBase = intercalate "-" . init . splitOn "-" . packageIdString
 -- | Get the list of modules provided by a package.
 getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
 getPkgModules pkg =
-  defaultErrorHandler defaultLogAction $ do
+  defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       let dflags' = dflags { packageFlags = ExposePackage pkg : packageFlags dflags }

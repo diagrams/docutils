@@ -1,21 +1,20 @@
-{-# LANGUAGE TypeOperators
-           , Rank2Types
-           , TypeSynonymInstances
-           , NoMonomorphismRestriction
-  #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE Rank2Types                #-}
+{-# LANGUAGE TypeOperators             #-}
+{-# LANGUAGE TypeSynonymInstances      #-}
 
 module Text.Docutils.Writers.HTML where
 
-import Text.XML.HXT.Core
-import qualified Control.Category as C
+import qualified Control.Category   as C
+import           Text.XML.HXT.Core
 
-import Text.Docutils.Util
+import           Text.Docutils.Util
 
 ------------------------------------------------------------
 --  The main XML -> HTML conversion
 ------------------------------------------------------------
 
-xml2html :: ArrowXml (~>) => XmlT (~>)
+xml2html :: ArrowXml a => XmlT a
 xml2html = tSections >>>
            doTransforms
            [ tDocument
@@ -45,7 +44,7 @@ xml2html = tSections >>>
 --  Sections
 ------------------------------------------------------------
 
-tSections :: ArrowXml (~>) => XmlT (~>)
+tSections :: ArrowXml a => XmlT a
 tSections = tSections' (1 :: Integer)
   where tSections' n       = titleSection n `orElse` processChildren (tSections' n)
         titleSection n     = isTag "section" >>>
@@ -66,7 +65,7 @@ tSections = tSections' (1 :: Integer)
 -- XXX need to generalize this to allow generating both standalone and
 -- fragments
 
-tDocument :: ArrowXml (~>) => XmlT (~>)
+tDocument :: ArrowXml a => XmlT a
 tDocument = onElem "document" $
                 mkelem "div"
                 [ attr "class" (txt "document") ]
@@ -79,33 +78,33 @@ tDocument = onElem "document" $
                 ]
 
 -- replace any leftover title tags
-tTitle :: ArrowXml (~>) => XmlT (~>)
+tTitle :: ArrowXml a => XmlT a
 tTitle = replaceTag "title" "h2" []
 
-tTopic :: ArrowXml (~>) => XmlT (~>)
+tTopic :: ArrowXml a => XmlT a
 tTopic = onElem "topic" $
   eelem "div"
     += attr "class" (getAttrValue "classes" >>> mkText)
     += attr "id"    (getAttrValue "ids" >>> mkText)
     += getChildren
 
-tLiterals :: ArrowXml (~>) => XmlT (~>)
+tLiterals :: ArrowXml a => XmlT a
 tLiterals = replaceTag "literal" "code" []
 
-tLiteralBlocks :: ArrowXml (~>) => XmlT (~>)
+tLiteralBlocks :: ArrowXml a => XmlT a
 tLiteralBlocks = onElem "literal_block" $
   eelem "pre"
     += (eelem "code" += getChildren)
 
-tPara :: ArrowXml (~>) => XmlT (~>)
+tPara :: ArrowXml a => XmlT a
 tPara = replaceTag "paragraph" "p" []
 
-tTitleRef :: ArrowXml (~>) => XmlT (~>)
+tTitleRef :: ArrowXml a => XmlT a
 tTitleRef = replaceTag "title_reference" "cite" []
 
 -- XXX check whether it is an internal or other sort of reference
 -- based on the attributes.
-tReference :: ArrowXml (~>) => XmlT (~>)
+tReference :: ArrowXml a => XmlT a
 tReference = onElem "reference" $
   ifA (hasAttr "refuri")
     (setTag "a"
@@ -119,44 +118,44 @@ tReference = onElem "reference" $
      ]
     )
 
-tTarget :: ArrowXml (~>) => XmlT (~>)
+tTarget :: ArrowXml a => XmlT a
 tTarget = onElem "target" $ txt ""
 
-tEmph :: ArrowXml (~>) => XmlT (~>)
+tEmph :: ArrowXml a => XmlT a
 tEmph = replaceTag "emphasis" "em" []
 
-tBulletList :: ArrowXml (~>) => XmlT (~>)
+tBulletList :: ArrowXml a => XmlT a
 tBulletList = replaceTag "bullet_list" "ul" []
 
-tEnumList :: ArrowXml (~>) => XmlT (~>)
+tEnumList :: ArrowXml a => XmlT a
 tEnumList = replaceTag "enumerated_list" "ol" []
 
-tListItem :: ArrowXml (~>) => XmlT (~>)
+tListItem :: ArrowXml a => XmlT a
 tListItem = replaceTag "list_item" "li" []
 
-tBlockquote :: ArrowXml (~>) => XmlT (~>)
+tBlockquote :: ArrowXml a => XmlT a
 tBlockquote = replaceTag "block_quote" "blockquote" []
 
 -- XXX fix me
 --   2. merge with previous and next paragraphs if present
-tDispMath :: ArrowXml (~>) => XmlT (~>)
+tDispMath :: ArrowXml a => XmlT a
 tDispMath = onElem "paragraph" $
   (getChildren >>> getChildren >>> getText >>> arr (("\\[" ++) . (++ "\\]")) >>> mkText)
   `when`
   (listA getChildren >>> isA ((==1) . length) >>> unlistA
     >>> isElem >>> hasName "math")
 
-tMath :: ArrowXml (~>) => XmlT (~>)
+tMath :: ArrowXml a => XmlT a
 tMath = onElem "math" $
   getChildren >>> getText >>> arr (("\\(" ++) . (++ "\\)")) >>> mkText
 
-tContainer :: ArrowXml (~>) => XmlT (~>)
+tContainer :: ArrowXml a => XmlT a
 tContainer = onElem "container" $
   eelem "div"
     += attr "class" (getAttrValue "classes" >>> mkText)
     += getChildren
 
-tEmDash :: ArrowXml (~>) => XmlT (~>)
+tEmDash :: ArrowXml a => XmlT a
 tEmDash = (getText >>> arr mkEmDashes >>> mkText) `when` isText
   where mkEmDashes [] = []
         mkEmDashes ('-':'-':'-':t) = '—' : mkEmDashes t
@@ -166,7 +165,7 @@ tEmDash = (getText >>> arr mkEmDashes >>> mkText) `when` isText
 -- Utilities
 ------------------------------------------------------------
 
-styleFile :: ArrowXml (~>) => String -> XmlT (~>)
+styleFile :: ArrowXml a => String -> XmlT a
 styleFile s =
   onElem "head" $
     C.id += (eelem "link" += attr "rel" (txt "stylesheet")
