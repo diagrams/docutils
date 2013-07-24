@@ -1,14 +1,21 @@
 {-# LANGUAGE Arrows        #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE CPP           #-}
 
 module Text.Docutils.Transformers.Haskell where
 
 -- import Debug.Trace
 
+#if MIN_VERSION_ghc(7,6,0)
 import           DynFlags                        (PackageFlag (ExposePackage),
                                                   defaultFatalMessager,
                                                   defaultFlushOut)
+#else
+import           DynFlags                        (PackageFlag (ExposePackage),
+                                                  defaultLogAction)
+#endif
+
 import           GHC                             (ModuleInfo,
                                                   defaultErrorHandler,
                                                   getModuleInfo,
@@ -172,7 +179,11 @@ packageIdStringBase = intercalate "-" . init . splitOn "-" . packageIdString
 -- | Get the list of modules provided by a package.
 getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
 getPkgModules pkg =
+#if MIN_VERSION_ghc(7,6,0)
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
+#else
+  defaultErrorHandler defaultLogAction $ do
+#endif
     runGhc (Just libdir) $ do
       dflags <- getSessionDynFlags
       let dflags' = dflags { packageFlags = ExposePackage pkg : packageFlags dflags }
