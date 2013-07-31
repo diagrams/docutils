@@ -20,9 +20,10 @@ import           GHC                             (ModuleInfo,
                                                   defaultErrorHandler,
                                                   getModuleInfo,
                                                   getSessionDynFlags,
+                                                  parseDynamicFlags,
                                                   modInfoExports, packageFlags,
                                                   pkgState, runGhc,
-                                                  setSessionDynFlags)
+                                                  setSessionDynFlags, noLoc)
 import           GHC.Paths                       (libdir)
 import           Module                          (ModuleName, PackageId,
                                                   mkModule, mkModuleName,
@@ -39,7 +40,7 @@ import           Data.Char
 import           Data.List                       (intercalate, isPrefixOf)
 import qualified Data.Map                        as M
 import           Data.Maybe                      (catMaybes, fromJust,
-                                                  listToMaybe)
+                                                  listToMaybe, fromMaybe)
 
 import           Data.List.Split                 (condense, oneOf, split,
                                                   splitOn)
@@ -52,6 +53,7 @@ import           Text.Highlighting.Kate          (defaultFormatOpts,
                                                   formatHtmlInline, highlightAs)
 
 import           Text.Docutils.Util              (XmlT, mkLink, onElemA)
+import           System.Environment              (getEnvironment)
 
 hackagePkgPrefix :: String
 hackagePkgPrefix = "http://hackage.haskell.org/package/"
@@ -176,6 +178,15 @@ type NameMap = M.Map String ModuleName
 packageIdStringBase :: PackageId -> String
 packageIdStringBase = intercalate "-" . init . splitOn "-" . packageIdString
 
+
+getHsenvArgv :: IO [String]
+getHsenvArgv = do
+  env <- getEnvironment
+  return $ case (lookup "HSENV" env) of
+             Nothing -> []
+             _       -> hsenvArgv
+                 where hsenvArgv = words $ fromMaybe "" (lookup "PACKAGE_DB_FOR_GHC" env)
+
 -- | Get the list of modules provided by a package.
 getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
 getPkgModules pkg =
@@ -185,11 +196,14 @@ getPkgModules pkg =
   defaultErrorHandler defaultLogAction $ do
 #endif
     runGhc (Just libdir) $ do
-      dflags <- getSessionDynFlags
-      let dflags' = dflags { packageFlags = ExposePackage pkg : packageFlags dflags }
-      (dflags'', pids) <- liftIO $ initPackages dflags'
-      _ <- setSessionDynFlags dflags''
-      let pkgSt    = pkgState dflags''
+      dflags0 <- getSessionDynFlags
+      let dflags1 = dflags0 { packageFlags = ExposePackage pkg : packageFlags dflags0 }
+      args <- liftIO getHsenvArgv
+      let args' = map noLoc args
+      (dflags2, _, _) <- parseDynamicFlags dflags1 args'
+      (dflags3, pids) <- liftIO $ initPackages dflags2
+      _ <- setSessionDynFlags dflags3
+      let pkgSt    = pkgState dflags3
           mpid     = listToMaybe (filter ((pkg `isPrefixOf`) . packageIdString) pids)
           mpkgMods = (id &&& (exposedModules . getPackageDetails pkgSt)) <$> mpid
       case mpkgMods of
