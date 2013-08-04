@@ -23,6 +23,7 @@ xml2html = tSections >>>
            , tDispMath
            , tPara
            , tEmph
+           , tImage
            , tBulletList
            , tEnumList
            , tListItem
@@ -123,6 +124,15 @@ tTarget = onElem "target" $ txt ""
 
 tEmph :: ArrowXml a => XmlT a
 tEmph = replaceTag "emphasis" "em" []
+
+tImage :: ArrowXml a => XmlT a
+tImage = onElem "image" $
+  eelem "div"
+    += attr "style" (getAttrValue "align" >>> arr ("text-align: " ++) >>> mkText)
+    += (eelem "img"
+          += attr "src" (getAttrValue "uri" >>> mkText)
+          += getAttrl
+       )
 
 tBulletList :: ArrowXml a => XmlT a
 tBulletList = replaceTag "bullet_list" "ul" []
