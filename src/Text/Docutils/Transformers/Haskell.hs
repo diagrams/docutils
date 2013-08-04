@@ -1,7 +1,7 @@
 {-# LANGUAGE Arrows        #-}
+{-# LANGUAGE CPP           #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE CPP           #-}
 
 module Text.Docutils.Transformers.Haskell where
 
@@ -20,10 +20,10 @@ import           GHC                             (ModuleInfo,
                                                   defaultErrorHandler,
                                                   getModuleInfo,
                                                   getSessionDynFlags,
-                                                  parseDynamicFlags,
-                                                  modInfoExports, packageFlags,
-                                                  pkgState, runGhc,
-                                                  setSessionDynFlags, noLoc)
+                                                  modInfoExports, noLoc,
+                                                  packageFlags,
+                                                  parseDynamicFlags, pkgState,
+                                                  runGhc, setSessionDynFlags)
 import           GHC.Paths                       (libdir)
 import           Module                          (ModuleName, PackageId,
                                                   mkModule, mkModuleName,
@@ -40,7 +40,7 @@ import           Data.Char
 import           Data.List                       (intercalate, isPrefixOf)
 import qualified Data.Map                        as M
 import           Data.Maybe                      (catMaybes, fromJust,
-                                                  listToMaybe, fromMaybe)
+                                                  fromMaybe, listToMaybe)
 
 import           Data.List.Split                 (condense, oneOf, split,
                                                   splitOn)
@@ -52,8 +52,8 @@ import           Text.Highlighting.Kate          (defaultFormatOpts,
                                                   formatHtmlBlock,
                                                   formatHtmlInline, highlightAs)
 
-import           Text.Docutils.Util              (XmlT, mkLink, onElemA)
 import           System.Environment              (getEnvironment)
+import           Text.Docutils.Util              (XmlT, mkLink, onElemA)
 
 hackagePkgPrefix :: String
 hackagePkgPrefix = "http://hackage.haskell.org/package/"
@@ -93,7 +93,7 @@ highlightBlockHS =
 --     parser.  The problem is that there can be markup in there
 --     already from the syntax highlighter.
 linkifyHS :: (ArrowChoice a, ArrowXml a) => NameMap -> ModuleMap -> XmlT a
-linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode LiterateHaskell")] $
+linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode")] $
                              linkifyHS'
   where linkifyHS' = (isText >>> linkifyAll) `orElse` (processChildren linkifyHS')
         linkifyAll = getText
@@ -150,7 +150,7 @@ linkifyModules modMap =
 mkAPILink :: ModuleMap -> Maybe String -> String -> String
 mkAPILink modMap mexp modName
 --  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
-  = "/doc/" ++ modPath ++ expHash   -- for linking to local API reference
+  = "/haddock/" ++ modPath ++ expHash   -- for linking to local API reference
   where modPath = map f modName ++ ".html"
         f '.' = '-'
         f x   = x
