@@ -1,33 +1,35 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeOperators      #-}
 
 module Text.Docutils.CmdLine where
 
-import System.Environment
-import System.Exit
+import           System.Environment
+import           System.Exit
 
-import System.Console.CmdArgs
-import Text.XML.HXT.Core
+import           System.Console.CmdArgs
+import           Text.XML.HXT.Core
 
 data DocutilOpts = DocutilOpts
   { outputDir  :: FilePath
   , sourceFile :: FilePath
   , destFile   :: FilePath
+  , keepGoing  :: Bool
   }
   deriving (Data, Typeable)
 
 docutils :: DocutilOpts
 docutils = DocutilOpts
-  { outputDir  = def &= typDir &= help "Output directory for generated files."
-  , sourceFile = def &= argPos 0
-  , destFile   = def &= argPos 1
+  { outputDir    = def &= typDir &= help "Output directory for generated files."
+  , sourceFile   = def &= argPos 0
+  , destFile     = def &= argPos 1
+  , keepGoing    = False &= help "Keep going on errors"
   }
 
 docutilsCmdLine :: (FilePath -> IOSArrow XmlTree XmlTree) -> IO ExitCode
 docutilsCmdLine transf = do
   opts <- cmdArgs docutils
   [rc] <- runX (application [withValidate no] opts transf)
-  if rc >= c_err
+  if rc >= c_err && not (keepGoing opts)
     then return (ExitFailure (0-1))
     else return ExitSuccess
 
