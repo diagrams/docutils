@@ -3,7 +3,6 @@
 
 module Text.Docutils.CmdLine where
 
-import           System.Environment
 import           System.Exit
 
 import           System.Console.CmdArgs

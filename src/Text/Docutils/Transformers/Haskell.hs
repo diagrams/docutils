@@ -26,8 +26,7 @@ import           GHC                             (ModuleInfo,
                                                   runGhc, setSessionDynFlags)
 import           GHC.Paths                       (libdir)
 import           Module                          (ModuleName, PackageId,
-                                                  mkModule, mkModuleName,
-                                                  moduleNameString,
+                                                  mkModule, moduleNameString,
                                                   packageIdString)
 import           MonadUtils                      (liftIO)
 import           Name                            (nameOccName, occNameString)
@@ -39,18 +38,20 @@ import           Control.Applicative             ((<$>))
 import           Data.Char
 import           Data.List                       (intercalate, isPrefixOf)
 import qualified Data.Map                        as M
-import           Data.Maybe                      (catMaybes, fromJust,
-                                                  fromMaybe, listToMaybe)
+import           Data.Maybe                      (catMaybes, fromMaybe,
+                                                  listToMaybe)
 
 import           Data.List.Split                 (condense, oneOf, split,
                                                   splitOn)
 
 import           Text.XML.HXT.Core
 
+import           Text.Blaze.Html                 (Html)
 import           Text.Blaze.Html.Renderer.String (renderHtml)
 import           Text.Highlighting.Kate          (defaultFormatOpts,
                                                   formatHtmlBlock,
                                                   formatHtmlInline, highlightAs)
+import           Text.Highlighting.Kate.Types    (SourceLine)
 
 import           System.Environment              (getEnvironment)
 import           Text.Docutils.Util              (XmlT, mkLink, onElemA)
@@ -124,9 +125,11 @@ highlightBlockHSArr :: ArrowXml a => XmlT a
 highlightBlockHSArr =
   getChildren >>> getText >>> arr (litify >>> highlightHSBlock) >>> hread
 
+highlightHSInline, highlightHSBlock :: String -> String
 highlightHSInline = highlightHS defaultFormatOpts formatHtmlInline
 highlightHSBlock  = highlightHS defaultFormatOpts formatHtmlBlock
 
+highlightHS :: opts -> (opts -> [SourceLine] -> Html) -> String -> String
 highlightHS opts fmt =
   renderHtml . fmt opts . highlightAs "LiterateHaskell"
 
@@ -148,13 +151,13 @@ linkifyModules modMap =
 -- XXX generalize this...
 
 mkAPILink :: ModuleMap -> Maybe String -> String -> String
-mkAPILink modMap mexp modName
+mkAPILink _modMap mexp modName
 --  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
   = "/haddock/" ++ modPath ++ expHash   -- for linking to local API reference
   where modPath = map f modName ++ ".html"
         f '.' = '-'
         f x   = x
-        pkg   = packageIdStringBase . fromJust {- . traceShow modName -} $ M.lookup (mkModuleName modName) modMap
+--        pkg   = packageIdStringBase . fromJust {- . traceShow modName -} $ M.lookup (mkModuleName modName) modMap
         -- XXX fix me!!!  Should not use fromJust, rather insert some
         -- kind of error marker if the module is not found.  Need to
         -- pull this processing out of mkAPILink since at this point it is too late.
