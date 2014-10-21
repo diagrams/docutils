@@ -45,6 +45,7 @@ import           Data.List.Split                 (condense, oneOf, split,
                                                   splitOn)
 
 import           Text.XML.HXT.Core
+import qualified Text.XML.HXT.Arrow.ParserInterface as PI
 
 import           Text.Blaze.Html                 (Html)
 import           Text.Blaze.Html.Renderer.String (renderHtml)
@@ -55,6 +56,12 @@ import           Text.Highlighting.Kate.Types    (SourceLine)
 
 import           System.Environment              (getEnvironment)
 import           Text.Docutils.Util              (XmlT, mkLink, onElemA)
+
+-- HXT 9.3.1.7 changed hread to canonicalize values dropping some content
+-- this hread' gives us the old behavior.
+hread' :: ArrowXml a => a String XmlTree
+hread' = fromLA $ PI.hread >>> editNTreeA [isError :-> none]
+
 
 hackagePkgPrefix :: String
 hackagePkgPrefix = "http://hackage.haskell.org/package/"
@@ -75,7 +82,7 @@ highlightInlineHS :: ArrowXml a => XmlT a
 highlightInlineHS =
   onElemA "literal" [("classes", "hs")] $
     removeAttr "classes" >>>
-    getChildren >>> getText >>> arr highlightHSInline >>> hread
+    getChildren >>> getText >>> arr highlightHSInline >>> hread'
 
 highlightBlockHS :: ArrowXml a => XmlT a
 highlightBlockHS =
@@ -123,15 +130,15 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode")] $
 
 highlightBlockHSArr :: ArrowXml a => XmlT a
 highlightBlockHSArr =
-  getChildren >>> getText >>> arr (litify >>> highlightHSBlock) >>> hread
+  getChildren >>> getText >>> arr (litify >>> highlightHSBlock) >>> hread'
 
 highlightHSInline, highlightHSBlock :: String -> String
-highlightHSInline = highlightHS defaultFormatOpts formatHtmlInline
-highlightHSBlock  = highlightHS defaultFormatOpts formatHtmlBlock
+highlightHSInline = highlightHS defaultFormatOpts formatHtmlInline "Haskell"
+highlightHSBlock  = highlightHS defaultFormatOpts formatHtmlBlock  "LiterateHaskell"
 
-highlightHS :: opts -> (opts -> [SourceLine] -> Html) -> String -> String
-highlightHS opts fmt =
-  renderHtml . fmt opts . highlightAs "LiterateHaskell"
+highlightHS :: opts -> (opts -> [SourceLine] -> Html) -> String -> String -> String
+highlightHS opts fmt as =
+  renderHtml . fmt opts . highlightAs as
 
 -- | If any lines begin with "> ", assume it is literate Haskell and
 --   leave it alone.  Otherwise, prefix every line with "> ".
