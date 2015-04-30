@@ -37,6 +37,7 @@ import           Packages                           (exposedModules,
 
 import           Control.Applicative                ((<$>))
 import           Data.Char
+import           Data.Function                      (on)
 import           Data.List                          (intercalate, isPrefixOf,
                                                      sortBy)
 import qualified Data.Map                           as M
@@ -104,7 +105,7 @@ highlightBlockHS =
 --     parser.  The problem is that there can be markup in there
 --     already from the syntax highlighter.
 linkifyHS :: (ArrowChoice a, ArrowXml a)
-          => (ModuleName -> ModuleName -> Ordering)  -- earlier modules are preferred
+          => (String -> String -> Ordering)  -- earlier modules are preferred
           -> NameMap -> ModuleMap -> XmlT a
 linkifyHS modComp nameMap modMap = onElemA "code" [("class", "sourceCode")] $
                              linkifyHS'
@@ -121,7 +122,7 @@ linkifyHS modComp nameMap modMap = onElemA "code" [("class", "sourceCode")] $
                            mkLink
                              (constA
                                (mkAPILink modMap (Just (encode (stripSpecials t)))
-                                 (moduleNameString (head $ sortBy modComp modNs))
+                                 (moduleNameString (head $ sortBy (modComp `on` moduleNameString) modNs))
                                )
                              )              -<< t
         stripSpecials ""       = ""
