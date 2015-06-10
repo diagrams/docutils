@@ -8,54 +8,58 @@ module Text.Docutils.Transformers.Haskell where
 -- import Debug.Trace
 
 #if MIN_VERSION_ghc(7,6,0)
-import           DynFlags                        (PackageFlag (ExposePackage),
-                                                  defaultFatalMessager,
-                                                  defaultFlushOut)
+import           DynFlags                           (PackageFlag (ExposePackage),
+                                                     defaultFatalMessager,
+                                                     defaultFlushOut)
 #else
-import           DynFlags                        (PackageFlag (ExposePackage),
-                                                  defaultLogAction)
+import           DynFlags                           (PackageFlag (ExposePackage),
+                                                     defaultLogAction)
 #endif
 
-import           GHC                             (ModuleInfo,
-                                                  defaultErrorHandler,
-                                                  getModuleInfo,
-                                                  getSessionDynFlags,
-                                                  modInfoExports, noLoc,
-                                                  packageFlags,
-                                                  parseDynamicFlags, pkgState,
-                                                  runGhc, setSessionDynFlags)
-import           GHC.Paths                       (libdir)
-import           Module                          (ModuleName, PackageId,
-                                                  mkModule, moduleNameString,
-                                                  packageIdString)
-import           MonadUtils                      (liftIO)
-import           Name                            (nameOccName, occNameString)
-import           Packages                        (exposedModules,
-                                                  getPackageDetails,
-                                                  initPackages)
+import           GHC                                (ModuleInfo,
+                                                     defaultErrorHandler,
+                                                     getModuleInfo,
+                                                     getSessionDynFlags,
+                                                     modInfoExports, noLoc,
+                                                     packageFlags,
+                                                     parseDynamicFlags,
+                                                     pkgState, runGhc,
+                                                     setSessionDynFlags)
+import           GHC.Paths                          (libdir)
+import           Module                             (ModuleName, PackageId,
+                                                     mkModule, moduleNameString,
+                                                     packageIdString)
+import           MonadUtils                         (liftIO)
+import           Name                               (nameOccName, occNameString)
+import           Packages                           (exposedModules,
+                                                     getPackageDetails,
+                                                     initPackages)
 
-import           Control.Applicative             ((<$>))
+import           Control.Applicative                ((<$>))
 import           Data.Char
-import           Data.List                       (intercalate, isPrefixOf)
-import qualified Data.Map                        as M
-import           Data.Maybe                      (catMaybes, fromMaybe,
-                                                  listToMaybe)
+import           Data.Function                      (on)
+import           Data.List                          (intercalate, isPrefixOf,
+                                                     sortBy)
+import qualified Data.Map                           as M
+import           Data.Maybe                         (catMaybes, fromMaybe,
+                                                     listToMaybe)
 
-import           Data.List.Split                 (condense, oneOf, split,
-                                                  splitOn)
+import           Data.List.Split                    (condense, oneOf, split,
+                                                     splitOn)
 
-import           Text.XML.HXT.Core
 import qualified Text.XML.HXT.Arrow.ParserInterface as PI
+import           Text.XML.HXT.Core
 
-import           Text.Blaze.Html                 (Html)
-import           Text.Blaze.Html.Renderer.String (renderHtml)
-import           Text.Highlighting.Kate          (defaultFormatOpts,
-                                                  formatHtmlBlock,
-                                                  formatHtmlInline, highlightAs)
-import           Text.Highlighting.Kate.Types    (SourceLine)
+import           Text.Blaze.Html                    (Html)
+import           Text.Blaze.Html.Renderer.String    (renderHtml)
+import           Text.Highlighting.Kate             (defaultFormatOpts,
+                                                     formatHtmlBlock,
+                                                     formatHtmlInline,
+                                                     highlightAs)
+import           Text.Highlighting.Kate.Types       (SourceLine)
 
-import           System.Environment              (getEnvironment)
-import           Text.Docutils.Util              (XmlT, mkLink, onElemA)
+import           System.Environment                 (getEnvironment)
+import           Text.Docutils.Util                 (XmlT, mkLink, onElemA)
 
 -- HXT 9.3.1.7 changed hread to canonicalize values dropping some content
 -- this hread' gives us the old behavior.
@@ -100,8 +104,10 @@ highlightBlockHS =
 --     identifying things to link.  Really ought to use a proper
 --     parser.  The problem is that there can be markup in there
 --     already from the syntax highlighter.
-linkifyHS :: (ArrowChoice a, ArrowXml a) => NameMap -> ModuleMap -> XmlT a
-linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode")] $
+linkifyHS :: (ArrowChoice a, ArrowXml a)
+          => (String -> String -> Ordering)  -- earlier modules are preferred
+          -> NameMap -> ModuleMap -> XmlT a
+linkifyHS modComp nameMap modMap = onElemA "code" [("class", "sourceCode")] $
                              linkifyHS'
   where linkifyHS' = (isText >>> linkifyAll) `orElse` (processChildren linkifyHS')
         linkifyAll = getText
@@ -109,13 +115,14 @@ linkifyHS nameMap modMap = onElemA "code" [("class", "sourceCode")] $
                  >>> linkify
         linkify    = proc t -> do
                        case M.lookup (stripSpecials t) nameMap of
-                         Nothing   -> mkText -< t
-                         Just modN ->
+                         Nothing    -> mkText -< t
+                         Just []    -> mkText -< t
+                         Just modNs ->
                            mkText >>>
                            mkLink
                              (constA
                                (mkAPILink modMap (Just (encode (stripSpecials t)))
-                                 (moduleNameString modN)
+                                 (moduleNameString (head $ sortBy (modComp `on` moduleNameString) modNs))
                                )
                              )              -<< t
         stripSpecials ""       = ""
@@ -181,8 +188,10 @@ mkAPILink _modMap mexp modName
 -- | A mapping from modules to packages.
 type ModuleMap = M.Map ModuleName PackageId
 
--- | A mapping from exported names to modules.
-type NameMap = M.Map String ModuleName
+-- | A mapping from exported names to modules.  Since multiple modules
+--   may re-export the same name, we map from names to a list of
+--   modules.
+type NameMap = M.Map String [ModuleName]
 
 -- | Convert a 'PackageId' to a String without the trailing version number.
 packageIdStringBase :: PackageId -> String
@@ -223,17 +232,33 @@ getPkgModules pkg =
                    mapM (fmap strength . strength . (id &&& getModuleInfo . mkModule pkgid)) ns
           return . Just $ (pkgid, mis)
 
--- | Given a list of package names, build a mapping from module names to
---   packages so we can look up what package provides a given module.
+-- | Given a list of package names, build two mappings: one from
+--   module names to packages so we can look up what package provides
+--   a given module, and one from identifier names to module names so
+--   we can look up what module exports a given identifier name.
 buildPackageMaps :: [String] -> IO (ModuleMap, NameMap)
 buildPackageMaps pkgs = do
+
+  -- getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
+  -- mapM getPkgModules :: [String] -> IO [Maybe (PackageId, [(ModuleName, ModuleInfo)])]
+  -- mapM getPkgModules pkgs :: IO [Maybe (PackageId, [(ModuleName, ModuleInfo)])]
+  -- catMaybes <$> mapM getPkgModules pkgs :: IO [(PackageId, [(ModuleName, ModuleInfo)])]
+  -- pkgMods :: [(PackageId, [(ModuleName, ModuleInfo)])]
+
   pkgMods <- catMaybes <$> mapM getPkgModules pkgs
+
+  -- concat . map strength $ pkgMods :: [(PackageId, (ModuleName, ModuleInfo))]
   let pkgModPairs = concat . map strength $ pkgMods
+
+      -- [(ModuleName, PackageId)]
       modMap      = M.fromList . map (first fst . swap) $ pkgModPairs
-      nameMap     = M.fromList
+
+      nameMap     = buildMultiMap
                     . (map . first) (occNameString . nameOccName)
                     . concatMap (map swap . strength . second modInfoExports . snd)
                     $ pkgModPairs
+      buildMultiMap :: Ord k => [(k,a)] -> M.Map k [a]
+      buildMultiMap = foldr (uncurry (M.insertWith (++))) M.empty . (map . second) (:[])
   return (modMap, nameMap)
 
 strength :: Functor f => (a, f b) -> f (a, b)
