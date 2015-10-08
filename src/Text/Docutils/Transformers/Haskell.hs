@@ -8,7 +8,8 @@ module Text.Docutils.Transformers.Haskell where
 -- import Debug.Trace
 
 #if MIN_VERSION_ghc(7,6,0)
-import           DynFlags                           (PackageFlag (ExposePackage),
+import           DynFlags                           (ModRenaming (..),
+                                                     PackageArg (PackageArg), PackageFlag (ExposePackage),
                                                      defaultFatalMessager,
                                                      defaultFlushOut)
 #else
@@ -25,10 +26,11 @@ import           GHC                                (ModuleInfo,
                                                      parseDynamicFlags,
                                                      pkgState, runGhc,
                                                      setSessionDynFlags)
+import           GHC.PackageDb                      (exposedName)
 import           GHC.Paths                          (libdir)
-import           Module                             (ModuleName, PackageId,
+import           Module                             (ModuleName, PackageKey,
                                                      mkModule, moduleNameString,
-                                                     packageIdString)
+                                                     packageKeyString)
 import           MonadUtils                         (liftIO)
 import           Name                               (nameOccName, occNameString)
 import           Packages                           (exposedModules,
@@ -171,7 +173,7 @@ mkAPILink _modMap mexp modName
   where modPath = map f modName ++ ".html"
         f '.' = '-'
         f x   = x
---        pkg   = packageIdStringBase . fromJust {- . traceShow modName -} $ M.lookup (mkModuleName modName) modMap
+--        pkg   = packageKeyStringBase . fromJust {- . traceShow modName -} $ M.lookup (mkModuleName modName) modMap
         -- XXX fix me!!!  Should not use fromJust, rather insert some
         -- kind of error marker if the module is not found.  Need to
         -- pull this processing out of mkAPILink since at this point it is too late.
@@ -186,16 +188,16 @@ mkAPILink _modMap mexp modName
 ------------------------------------------------------------
 
 -- | A mapping from modules to packages.
-type ModuleMap = M.Map ModuleName PackageId
+type ModuleMap = M.Map ModuleName PackageKey
 
 -- | A mapping from exported names to modules.  Since multiple modules
 --   may re-export the same name, we map from names to a list of
 --   modules.
 type NameMap = M.Map String [ModuleName]
 
--- | Convert a 'PackageId' to a String without the trailing version number.
-packageIdStringBase :: PackageId -> String
-packageIdStringBase = intercalate "-" . init . splitOn "-" . packageIdString
+-- | Convert a 'PackageKey' to a String without the trailing version number.
+packageKeyStringBase :: PackageKey -> String
+packageKeyStringBase = intercalate "-" . init . splitOn "-" . packageKeyString
 
 
 getHsenvArgv :: IO [String]
@@ -207,24 +209,20 @@ getHsenvArgv = do
                  where hsenvArgv = words $ fromMaybe "" (lookup "PACKAGE_DB_FOR_GHC" env)
 
 -- | Get the list of modules provided by a package.
-getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
+getPkgModules :: String -> IO (Maybe (PackageKey, [(ModuleName, ModuleInfo)]))
 getPkgModules pkg =
-#if MIN_VERSION_ghc(7,6,0)
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
-#else
-  defaultErrorHandler defaultLogAction $ do
-#endif
     runGhc (Just libdir) $ do
       dflags0 <- getSessionDynFlags
-      let dflags1 = dflags0 { packageFlags = ExposePackage pkg : packageFlags dflags0 }
+      let dflags1 = dflags0 { packageFlags = ExposePackage (PackageArg pkg) (ModRenaming False []) : packageFlags dflags0 }
       args <- liftIO getHsenvArgv
       let args' = map noLoc args
       (dflags2, _, _) <- parseDynamicFlags dflags1 args'
       (dflags3, pids) <- liftIO $ initPackages dflags2
+      -- pids :: [PackageKey]
       _ <- setSessionDynFlags dflags3
-      let pkgSt    = pkgState dflags3
-          mpid     = listToMaybe (filter ((pkg `isPrefixOf`) . packageIdString) pids)
-          mpkgMods = (id &&& (exposedModules . getPackageDetails pkgSt)) <$> mpid
+      let mpid     = listToMaybe (filter ((pkg `isPrefixOf`) . packageKeyString) pids)
+          mpkgMods = (id &&& (map exposedName . exposedModules . getPackageDetails dflags3)) <$> mpid
       case mpkgMods of
         Nothing          -> return Nothing
         Just (pkgid, ns) -> do
@@ -239,18 +237,18 @@ getPkgModules pkg =
 buildPackageMaps :: [String] -> IO (ModuleMap, NameMap)
 buildPackageMaps pkgs = do
 
-  -- getPkgModules :: String -> IO (Maybe (PackageId, [(ModuleName, ModuleInfo)]))
-  -- mapM getPkgModules :: [String] -> IO [Maybe (PackageId, [(ModuleName, ModuleInfo)])]
-  -- mapM getPkgModules pkgs :: IO [Maybe (PackageId, [(ModuleName, ModuleInfo)])]
-  -- catMaybes <$> mapM getPkgModules pkgs :: IO [(PackageId, [(ModuleName, ModuleInfo)])]
-  -- pkgMods :: [(PackageId, [(ModuleName, ModuleInfo)])]
+  -- getPkgModules :: String -> IO (Maybe (PackageKey, [(ModuleName, ModuleInfo)]))
+  -- mapM getPkgModules :: [String] -> IO [Maybe (PackageKey, [(ModuleName, ModuleInfo)])]
+  -- mapM getPkgModules pkgs :: IO [Maybe (PackageKey, [(ModuleName, ModuleInfo)])]
+  -- catMaybes <$> mapM getPkgModules pkgs :: IO [(PackageKey, [(ModuleName, ModuleInfo)])]
+  -- pkgMods :: [(PackageKey, [(ModuleName, ModuleInfo)])]
 
   pkgMods <- catMaybes <$> mapM getPkgModules pkgs
 
-  -- concat . map strength $ pkgMods :: [(PackageId, (ModuleName, ModuleInfo))]
+  -- concat . map strength $ pkgMods :: [(PackageKey, (ModuleName, ModuleInfo))]
   let pkgModPairs = concat . map strength $ pkgMods
 
-      -- [(ModuleName, PackageId)]
+      -- [(ModuleName, PackageKey)]
       modMap      = M.fromList . map (first fst . swap) $ pkgModPairs
 
       nameMap     = buildMultiMap
