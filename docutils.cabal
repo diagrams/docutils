@@ -6,7 +6,7 @@ Description:         Tools for working with documents written using
 License:             BSD3
 License-file:        LICENSE
 Author:              Brent Yorgey
-Maintainer:          byorgey@cis.upenn.edu
+Maintainer:          byorgey@gmail.com
 Bug-reports:         http://github.com/diagrams/docutils/issues
 Category:            Text
 Build-type:          Simple
