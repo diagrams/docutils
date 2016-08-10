@@ -23,7 +23,7 @@ Library
                        Text.Docutils.Transformers.Haskell,
                        Text.Docutils.Writers.HTML
 
-  Build-depends:       base >= 4.0 && < 4.9,
+  Build-depends:       base >= 4.0 && < 4.10,
                        ghc-paths >= 0.1 && < 0.2,
                        ghc >= 7.10 && < 7.12,
                        bin-package-db,
