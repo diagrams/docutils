@@ -9,7 +9,8 @@ module Text.Docutils.Transformers.Haskell where
 
 #if MIN_VERSION_ghc(7,6,0)
 import           DynFlags                           (ModRenaming (..),
-                                                     PackageArg (PackageArg), PackageFlag (ExposePackage),
+                                                     PackageArg (PackageArg),
+                                                     PackageFlag (ExposePackage),
                                                      defaultFatalMessager,
                                                      defaultFlushOut)
 #else
@@ -28,8 +29,13 @@ import           GHC                                (ModuleInfo,
                                                      setSessionDynFlags)
 import           GHC.PackageDb                      (exposedName)
 import           GHC.Paths                          (libdir)
+
+  -- XXX NB: in GHC 8.0.1 PackageKey is renamed to UnitId, and now
+  -- contains a hash instead of a package name.  We will need to come
+  -- up with a different way to figure out the package name.
 import           Module                             (ModuleName, PackageKey,
-                                                     mkModule, moduleNameString,
+                                                     mkModule, mkModuleName,
+                                                     moduleNameString,
                                                      packageKeyString)
 import           MonadUtils                         (liftIO)
 import           Name                               (nameOccName, occNameString)
@@ -167,17 +173,13 @@ linkifyModules modMap =
 -- XXX generalize this...
 
 mkAPILink :: ModuleMap -> Maybe String -> String -> String
-mkAPILink _modMap mexp modName
+mkAPILink modMap mexp modName
 --  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
-  = "/haddock/" ++ modPath ++ expHash   -- for linking to local API reference
+  = "/haddock/" ++ pkgDir ++ modPath ++ expHash   -- for linking to local API reference
   where modPath = map f modName ++ ".html"
-        f '.' = '-'
-        f x   = x
---        pkg   = packageKeyStringBase . fromJust {- . traceShow modName -} $ M.lookup (mkModuleName modName) modMap
-        -- XXX fix me!!!  Should not use fromJust, rather insert some
-        -- kind of error marker if the module is not found.  Need to
-        -- pull this processing out of mkAPILink since at this point it is too late.
-        -- See implementation of linkifyHS for inspiration.
+        f '.'  = '-'
+        f x    = x
+        pkgDir = maybe "" packageKeyStringBase $ M.lookup (mkModuleName modName) modMap
         expHash | Just e@(e1:_) <- mexp = case () of
                     _ | isUpper e1 -> "#t:" ++ e
                       | otherwise  -> "#v:" ++ e
