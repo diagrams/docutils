@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP           #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TupleSections #-}
 
 module Text.Docutils.Transformers.Haskell where
 
@@ -179,7 +180,7 @@ mkAPILink modMap mexp modName
   where modPath = map f modName ++ ".html"
         f '.'  = '-'
         f x    = x
-        pkgDir = maybe "" packageKeyStringBase $ M.lookup (mkModuleName modName) modMap
+        pkgDir = maybe "" (++"/") $ M.lookup (mkModuleName modName) modMap
         expHash | Just e@(e1:_) <- mexp = case () of
                     _ | isUpper e1 -> "#t:" ++ e
                       | otherwise  -> "#v:" ++ e
@@ -189,18 +190,13 @@ mkAPILink modMap mexp modName
 --  Packages + modules
 ------------------------------------------------------------
 
--- | A mapping from modules to packages.
-type ModuleMap = M.Map ModuleName PackageKey
+-- | A mapping from modules to package names.
+type ModuleMap = M.Map ModuleName String
 
 -- | A mapping from exported names to modules.  Since multiple modules
 --   may re-export the same name, we map from names to a list of
 --   modules.
 type NameMap = M.Map String [ModuleName]
-
--- | Convert a 'PackageKey' to a String without the trailing version number.
-packageKeyStringBase :: PackageKey -> String
-packageKeyStringBase = intercalate "-" . init . splitOn "-" . packageKeyString
-
 
 getHsenvArgv :: IO [String]
 getHsenvArgv = do
@@ -211,7 +207,7 @@ getHsenvArgv = do
                  where hsenvArgv = words $ fromMaybe "" (lookup "PACKAGE_DB_FOR_GHC" env)
 
 -- | Get the list of modules provided by a package.
-getPkgModules :: String -> IO (Maybe (PackageKey, [(ModuleName, ModuleInfo)]))
+getPkgModules :: String -> IO (Maybe [(ModuleName, ModuleInfo)])
 getPkgModules pkg =
   defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
     runGhc (Just libdir) $ do
@@ -223,14 +219,14 @@ getPkgModules pkg =
       (dflags3, pids) <- liftIO $ initPackages dflags2
       -- pids :: [PackageKey]
       _ <- setSessionDynFlags dflags3
-      let mpid     = listToMaybe (filter ((pkg `isPrefixOf`) . packageKeyString) pids)
-          mpkgMods = (id &&& (map exposedName . exposedModules . getPackageDetails dflags3)) <$> mpid
+      let mpid     = listToMaybe (filter ((take 5 pkg `isPrefixOf`) . (take 5 . packageKeyString)) pids)
+      let mpkgMods = (id &&& (map exposedName . exposedModules . getPackageDetails dflags3)) <$> mpid
       case mpkgMods of
         Nothing          -> return Nothing
         Just (pkgid, ns) -> do
           mis <- catMaybes <$>
                    mapM (fmap strength . strength . (id &&& getModuleInfo . mkModule pkgid)) ns
-          return . Just $ (pkgid, mis)
+          return . Just $ mis
 
 -- | Given a list of package names, build two mappings: one from
 --   module names to packages so we can look up what package provides
@@ -239,18 +235,12 @@ getPkgModules pkg =
 buildPackageMaps :: [String] -> IO (ModuleMap, NameMap)
 buildPackageMaps pkgs = do
 
-  -- getPkgModules :: String -> IO (Maybe (PackageKey, [(ModuleName, ModuleInfo)]))
-  -- mapM getPkgModules :: [String] -> IO [Maybe (PackageKey, [(ModuleName, ModuleInfo)])]
-  -- mapM getPkgModules pkgs :: IO [Maybe (PackageKey, [(ModuleName, ModuleInfo)])]
-  -- catMaybes <$> mapM getPkgModules pkgs :: IO [(PackageKey, [(ModuleName, ModuleInfo)])]
-  -- pkgMods :: [(PackageKey, [(ModuleName, ModuleInfo)])]
+  pkgMods <- catMaybes <$> mapM (\pkg -> fmap (pkg,) <$> getPkgModules pkg) pkgs
 
-  pkgMods <- catMaybes <$> mapM getPkgModules pkgs
-
-  -- concat . map strength $ pkgMods :: [(PackageKey, (ModuleName, ModuleInfo))]
+  -- concat . map strength $ pkgMods :: [(String, (ModuleName, ModuleInfo))]
   let pkgModPairs = concat . map strength $ pkgMods
 
-      -- [(ModuleName, PackageKey)]
+      -- [(ModuleName, String)]
       modMap      = M.fromList . map (first fst . swap) $ pkgModPairs
 
       nameMap     = buildMultiMap
@@ -259,6 +249,7 @@ buildPackageMaps pkgs = do
                     $ pkgModPairs
       buildMultiMap :: Ord k => [(k,a)] -> M.Map k [a]
       buildMultiMap = foldr (uncurry (M.insertWith (++))) M.empty . (map . second) (:[])
+
   return (modMap, nameMap)
 
 strength :: Functor f => (a, f b) -> f (a, b)
