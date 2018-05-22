@@ -1,5 +1,5 @@
 Name:                docutils
-Version:             0.1
+Version:             0.2
 Synopsis:            Transformers and writers for docutils XML
 Description:         Tools for working with documents written using
                      reStructuredText markup
@@ -23,14 +23,14 @@ Library
                        Text.Docutils.Transformers.Haskell,
                        Text.Docutils.Writers.HTML
 
-  Build-depends:       base >= 4.0 && < 4.10,
+  Build-depends:       base >= 4.0 && < 4.12,
                        ghc-paths >= 0.1 && < 0.2,
-                       ghc >= 7.10 && < 7.12,
-                       bin-package-db,
+                       ghc >= 8.2 && < 8.5,
+                       ghc-boot,
                        containers >= 0.4 && < 0.6,
                        hxt >= 9.1.4 && < 9.4,
                        highlighting-kate >= 0.5 && < 0.7,
-                       blaze-html >= 0.5 && < 0.9,
+                       blaze-html >= 0.5 && < 0.10,
                        split >= 0.1 && < 0.3,
                        cmdargs >= 0.10 && < 0.11
 

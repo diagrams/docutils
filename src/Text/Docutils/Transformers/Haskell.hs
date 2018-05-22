@@ -8,41 +8,37 @@ module Text.Docutils.Transformers.Haskell where
 
 -- import Debug.Trace
 
-#if MIN_VERSION_ghc(7,6,0)
-import           DynFlags                           (ModRenaming (..),
-                                                     PackageArg (PackageArg),
-                                                     PackageFlag (ExposePackage),
-                                                     defaultFatalMessager,
-                                                     defaultFlushOut)
-#else
-import           DynFlags                           (PackageFlag (ExposePackage),
-                                                     defaultLogAction)
-#endif
+-- import           DynFlags                           (ModRenaming (..),
+--                                                      PackageArg (PackageArg),
+--                                                      PackageFlag (ExposePackage),
+--                                                      defaultFatalMessager,
+--                                                      defaultFlushOut)
 
-import           GHC                                (ModuleInfo,
-                                                     defaultErrorHandler,
-                                                     getModuleInfo,
-                                                     getSessionDynFlags,
-                                                     modInfoExports, noLoc,
-                                                     packageFlags,
-                                                     parseDynamicFlags,
-                                                     pkgState, runGhc,
-                                                     setSessionDynFlags)
-import           GHC.PackageDb                      (exposedName)
-import           GHC.Paths                          (libdir)
+-- import           GHC                                (ModuleInfo,
+--                                                      defaultErrorHandler,
+--                                                      getModuleInfo,
+--                                                      getSessionDynFlags,
+--                                                      modInfoExports, noLoc,
+--                                                      packageFlags,
+--                                                      parseDynamicFlags,
+--                                                      pkgState, runGhc,
+--                                                      setSessionDynFlags)
+
+-- import           GHC.PackageDb                      (exposedName)
+-- import           GHC.Paths                          (libdir)
 
   -- XXX NB: in GHC 8.0.1 PackageKey is renamed to UnitId, and now
   -- contains a hash instead of a package name.  We will need to come
   -- up with a different way to figure out the package name.
-import           Module                             (ModuleName, PackageKey,
-                                                     mkModule, mkModuleName,
-                                                     moduleNameString,
-                                                     packageKeyString)
-import           MonadUtils                         (liftIO)
-import           Name                               (nameOccName, occNameString)
-import           Packages                           (exposedModules,
-                                                     getPackageDetails,
-                                                     initPackages)
+-- import           Module                             (ModuleName, PackageKey,
+--                                                      mkModule, mkModuleName,
+--                                                      moduleNameString,
+--                                                      packageKeyString)
+-- import           MonadUtils                         (liftIO)
+-- import           Name                               (nameOccName, occNameString)
+-- import           Packages                           (exposedModules,
+--                                                      getPackageDetails,
+--                                                      initPackages)
 
 import           Control.Applicative                ((<$>))
 import           Data.Char
@@ -113,36 +109,36 @@ highlightBlockHS =
 --     identifying things to link.  Really ought to use a proper
 --     parser.  The problem is that there can be markup in there
 --     already from the syntax highlighter.
-linkifyHS :: (ArrowChoice a, ArrowXml a)
-          => (String -> String -> Ordering)  -- earlier modules are preferred
-          -> NameMap -> ModuleMap -> XmlT a
-linkifyHS modComp nameMap modMap = onElemA "code" [("class", "sourceCode")] $
-                             linkifyHS'
-  where linkifyHS' = (isText >>> linkifyAll) `orElse` (processChildren linkifyHS')
-        linkifyAll = getText
-                 >>> arrL (split (condense $ oneOf " "))
-                 >>> linkify
-        linkify    = proc t -> do
-                       case M.lookup (stripSpecials t) nameMap of
-                         Nothing    -> mkText -< t
-                         Just []    -> mkText -< t
-                         Just modNs ->
-                           mkText >>>
-                           mkLink
-                             (constA
-                               (mkAPILink modMap (Just (encode (stripSpecials t)))
-                                 (moduleNameString (head $ sortBy (modComp `on` moduleNameString) modNs))
-                               )
-                             )              -<< t
-        stripSpecials ""       = ""
-        stripSpecials "("      = ""
-        stripSpecials "`"      = ""
-        stripSpecials ('(':t') = init t'
-        stripSpecials ('`':t') = init t'
-        stripSpecials t' = t'
-        encode = concatMap encodeC
-        encodeC c | isAlphaNum c = [c]
-                  | otherwise    = '-' : show (ord c) ++ "-"
+-- linkifyHS :: (ArrowChoice a, ArrowXml a)
+--           => (String -> String -> Ordering)  -- earlier modules are preferred
+--           -> NameMap -> ModuleMap -> XmlT a
+-- linkifyHS modComp nameMap modMap = onElemA "code" [("class", "sourceCode")] $
+--                              linkifyHS'
+--   where linkifyHS' = (isText >>> linkifyAll) `orElse` (processChildren linkifyHS')
+--         linkifyAll = getText
+--                  >>> arrL (split (condense $ oneOf " "))
+--                  >>> linkify
+--         linkify    = proc t -> do
+--                        case M.lookup (stripSpecials t) nameMap of
+--                          Nothing    -> mkText -< t
+--                          Just []    -> mkText -< t
+--                          Just modNs ->
+--                            mkText >>>
+--                            mkLink
+--                              (constA
+--                                (mkAPILink modMap (Just (encode (stripSpecials t)))
+--                                  (moduleNameString (head $ sortBy (modComp `on` moduleNameString) modNs))
+--                                )
+--                              )              -<< t
+--         stripSpecials ""       = ""
+--         stripSpecials "("      = ""
+--         stripSpecials "`"      = ""
+--         stripSpecials ('(':t') = init t'
+--         stripSpecials ('`':t') = init t'
+--         stripSpecials t' = t'
+--         encode = concatMap encodeC
+--         encodeC c | isAlphaNum c = [c]
+--                   | otherwise    = '-' : show (ord c) ++ "-"
 
 highlightBlockHSArr :: ArrowXml a => XmlT a
 highlightBlockHSArr =
@@ -163,32 +159,34 @@ litify code | any ("> " `isPrefixOf`) ls = code
             | otherwise = unlines . map ("> " ++) $ ls
   where ls = lines code
 
-linkifyModules :: ArrowXml a => ModuleMap -> XmlT a
-linkifyModules modMap =
-  onElemA "literal" [("classes", "mod")] $
-    removeAttr "classes" >>>
-    eelem "span"
-      += attr "class" (txt "module")
-      += mkLink (getChildren >>> getText >>> arr (mkAPILink modMap Nothing))
+-- linkifyModules :: ArrowXml a => ModuleMap -> XmlT a
+-- linkifyModules modMap =
+--   onElemA "literal" [("classes", "mod")] $
+--     removeAttr "classes" >>>
+--     eelem "span"
+--       += attr "class" (txt "module")
+--       += mkLink (getChildren >>> getText >>> arr (mkAPILink modMap Nothing))
 
 -- XXX generalize this...
 
-mkAPILink :: ModuleMap -> Maybe String -> String -> String
-mkAPILink modMap mexp modName
---  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
-  = "/haddock/" ++ pkgDir ++ modPath ++ expHash   -- for linking to local API reference
-  where modPath = map f modName ++ ".html"
-        f '.'  = '-'
-        f x    = x
-        pkgDir = maybe "" (++"/") $ M.lookup (mkModuleName modName) modMap
-        expHash | Just e@(e1:_) <- mexp = case () of
-                    _ | isUpper e1 -> "#t:" ++ e
-                      | otherwise  -> "#v:" ++ e
-                | otherwise      = ""
+-- mkAPILink :: ModuleMap -> Maybe String -> String -> String
+-- mkAPILink modMap mexp modName
+-- --  = hackageAPIPrefix ++ pkg ++ hackageAPIPath ++ modPath ++ expHash
+--   = "/haddock/" ++ pkgDir ++ modPath ++ expHash   -- for linking to local API reference
+--   where modPath = map f modName ++ ".html"
+--         f '.'  = '-'
+--         f x    = x
+--         pkgDir = maybe "" (++"/") $ M.lookup (mkModuleName modName) modMap
+--         expHash | Just e@(e1:_) <- mexp = case () of
+--                     _ | isUpper e1 -> "#t:" ++ e
+--                       | otherwise  -> "#v:" ++ e
+--                 | otherwise      = ""
 
 ------------------------------------------------------------
 --  Packages + modules
 ------------------------------------------------------------
+
+{-
 
 -- | A mapping from modules to package names.
 type ModuleMap = M.Map ModuleName String
@@ -259,3 +257,5 @@ strength (x,f) = fmap ((,) x) f
 -- To do:
 --   + automatically look up/insert type signatures
 --   + automatically typeset ghci sessions
+
+-}
