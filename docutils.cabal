@@ -23,11 +23,11 @@ Library
                        Text.Docutils.Transformers.Haskell,
                        Text.Docutils.Writers.HTML
 
-  Build-depends:       base >= 4.0 && < 4.12,
+  Build-depends:       base >= 4.0 && < 4.16,
                        ghc-paths >= 0.1 && < 0.2,
-                       ghc >= 8.2 && < 8.5,
+                       ghc >= 8.2 && < 8.11,
                        ghc-boot,
-                       containers >= 0.4 && < 0.6,
+                       containers >= 0.4 && < 0.7,
                        hxt >= 9.1.4 && < 9.4,
                        highlighting-kate >= 0.5 && < 0.7,
                        blaze-html >= 0.5 && < 0.10,
