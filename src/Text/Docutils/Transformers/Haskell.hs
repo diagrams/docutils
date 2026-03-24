@@ -1,8 +1,6 @@
-{-# LANGUAGE Arrows        #-}
-{-# LANGUAGE CPP           #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Text.Docutils.Transformers.Haskell where
 
@@ -27,9 +25,9 @@ module Text.Docutils.Transformers.Haskell where
 -- import           GHC.PackageDb                      (exposedName)
 -- import           GHC.Paths                          (libdir)
 
-  -- XXX NB: in GHC 8.0.1 PackageKey is renamed to UnitId, and now
-  -- contains a hash instead of a package name.  We will need to come
-  -- up with a different way to figure out the package name.
+-- XXX NB: in GHC 8.0.1 PackageKey is renamed to UnitId, and now
+-- contains a hash instead of a package name.  We will need to come
+-- up with a different way to figure out the package name.
 -- import           Module                             (ModuleName, PackageKey,
 --                                                      mkModule, mkModuleName,
 --                                                      moduleNameString,
@@ -40,58 +38,73 @@ module Text.Docutils.Transformers.Haskell where
 --                                                      getPackageDetails,
 --                                                      initPackages)
 
-import           Control.Applicative                ((<$>))
-import           Data.Char
-import           Data.Function                      (on)
-import           Data.List                          (intercalate, isPrefixOf,
-                                                     sortBy)
-import qualified Data.Map                           as M
-import           Data.Maybe                         (catMaybes, fromMaybe,
-                                                     listToMaybe)
+import Control.Applicative ((<$>))
+import Data.Char
+import Data.Function (on)
+import Data.List (
+  intercalate,
+  isPrefixOf,
+  sortBy,
+ )
+import Data.Map qualified as M
+import Data.Maybe (
+  catMaybes,
+  fromMaybe,
+  listToMaybe,
+ )
 
-import           Data.List.Split                    (condense, oneOf, split,
-                                                     splitOn)
+import Data.List.Split (
+  condense,
+  oneOf,
+  split,
+  splitOn,
+ )
+import Data.Text qualified as T
 
-import qualified Text.XML.HXT.Arrow.ParserInterface as PI
-import           Text.XML.HXT.Core
+import Text.XML.HXT.Arrow.ParserInterface qualified as PI
+import Text.XML.HXT.Core
 
-import           Text.Blaze.Html                    (Html)
-import           Text.Blaze.Html.Renderer.String    (renderHtml)
-import           Text.Highlighting.Kate             (defaultFormatOpts,
-                                                     formatHtmlBlock,
-                                                     formatHtmlInline,
-                                                     highlightAs)
-import           Text.Highlighting.Kate.Types       (SourceLine)
+import Skylighting.Format.HTML (
+  formatHtmlBlock,
+  formatHtmlInline,
+ )
+import Skylighting.Tokenizer (TokenizerConfig (..), tokenize)
+import Skylighting.Types (SourceLine, Syntax, defaultFormatOpts)
+import Text.Blaze.Html (Html)
+import Text.Blaze.Html.Renderer.String (renderHtml)
 
-import           System.Environment                 (getEnvironment)
-import           Text.Docutils.Util                 (XmlT, mkLink, onElemA)
+import Skylighting (defaultSyntaxMap, lookupSyntax)
+import System.Environment (getEnvironment)
+import Text.Docutils.Util (XmlT, mkLink, onElemA)
 
 -- HXT 9.3.1.7 changed hread to canonicalize values dropping some content
 -- this hread' gives us the old behavior.
 hread' :: ArrowXml a => a String XmlTree
 hread' = fromLA $ PI.hread >>> editNTreeA [isError :-> none]
 
-
 hackagePkgPrefix :: String
 hackagePkgPrefix = "http://hackage.haskell.org/package/"
 
 hackageAPIPrefix, hackageAPIPath :: String
 hackageAPIPrefix = "http://hackage.haskell.org/packages/archive/"
-hackageAPIPath   = "/latest/doc/html/"
+hackageAPIPath = "/latest/doc/html/"
 
 linkifyHackage :: ArrowXml a => XmlT a
 linkifyHackage =
   onElemA "literal" [("classes", "pkg")] $
-    removeAttr "classes" >>>
-    eelem "span"
+    removeAttr "classes"
+      >>> eelem "span"
       += attr "class" (txt "package")
       += mkLink (getChildren >>> getText >>> arr (hackagePkgPrefix ++))
 
 highlightInlineHS :: ArrowXml a => XmlT a
 highlightInlineHS =
   onElemA "literal" [("classes", "hs")] $
-    removeAttr "classes" >>>
-    getChildren >>> getText >>> arr highlightHSInline >>> hread'
+    removeAttr "classes"
+      >>> getChildren
+      >>> getText
+      >>> arr highlightHSInline
+      >>> hread'
 
 highlightBlockHS :: ArrowXml a => XmlT a
 highlightBlockHS =
@@ -144,20 +157,29 @@ highlightBlockHSArr :: ArrowXml a => XmlT a
 highlightBlockHSArr =
   getChildren >>> getText >>> arr (litify >>> highlightHSBlock) >>> hread'
 
-highlightHSInline, highlightHSBlock :: String -> String
-highlightHSInline = highlightHS defaultFormatOpts formatHtmlInline "Haskell"
-highlightHSBlock  = highlightHS defaultFormatOpts formatHtmlBlock  "LiterateHaskell"
+-- XXX get Syntax values corresponding to Haskell, LiterateHaskell
 
-highlightHS :: opts -> (opts -> [SourceLine] -> Html) -> String -> String -> String
-highlightHS opts fmt as =
-  renderHtml . fmt opts . highlightAs as
+haskell, literateHaskell :: Syntax
+Just haskell = lookupSyntax "Haskell" defaultSyntaxMap
+Just literateHaskell = lookupSyntax "LiterateHaskell" defaultSyntaxMap
+
+highlightHSInline, highlightHSBlock :: String -> String
+highlightHSInline = highlightHS defaultFormatOpts formatHtmlInline haskell
+highlightHSBlock = highlightHS defaultFormatOpts formatHtmlBlock literateHaskell
+
+highlightHS :: opts -> (opts -> [SourceLine] -> Html) -> Syntax -> String -> String
+highlightHS opts fmt syn t = case tokenize (TokenizerConfig defaultSyntaxMap False) syn (T.pack t) of
+  Left err -> err
+  Right res -> renderHtml . fmt opts $ res
 
 -- | If any lines begin with "> ", assume it is literate Haskell and
 --   leave it alone.  Otherwise, prefix every line with "> ".
 litify :: String -> String
-litify code | any ("> " `isPrefixOf`) ls = code
-            | otherwise = unlines . map ("> " ++) $ ls
-  where ls = lines code
+litify code
+  | any ("> " `isPrefixOf`) ls = code
+  | otherwise = unlines . map ("> " ++) $ ls
+ where
+  ls = lines code
 
 -- linkifyModules :: ArrowXml a => ModuleMap -> XmlT a
 -- linkifyModules modMap =
@@ -252,7 +274,6 @@ buildPackageMaps pkgs = do
 
 strength :: Functor f => (a, f b) -> f (a, b)
 strength (x,f) = fmap ((,) x) f
-
 
 -- To do:
 --   + automatically look up/insert type signatures
